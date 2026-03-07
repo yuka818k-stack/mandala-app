@@ -2,16 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    
-    <!-- iOS / iPad Web App (PWA) Settings -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Mandala">
-    
-    <!-- Apple Touch Icon (Auto-generated Base64 SVG) -->
-    <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNTYgMjU2Ij48cmVjdCB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgZmlsbD0iIzBmMTcydGEiLz48Y2lyY2xlIGN4PSIxMjgiIGN5PSIxMjgiIHI9IjgwIiBmaWxsPSJub25lIiBzdHJva2U9IiMzOGJkZjgiIHN0cm9rZS13aWR0aD0iNCIvPjxjaXJjbGUgY3g9IjEyOCIgY3k9IjEyOCIgcj0iNDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzM4YmRmOCIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9zdmc+">
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Akashic Mandala Canvas Pro + Gemini</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -20,14 +11,6 @@
             color: #e2e8f0;
             overflow: hidden;
             touch-action: none;
-            /* iPadのノッチやホームインジケーター領域を確保 */
-            padding-top: env(safe-area-inset-top);
-            padding-bottom: env(safe-area-inset-bottom);
-            padding-left: env(safe-area-inset-left);
-            padding-right: env(safe-area-inset-right);
-            /* 長押しによるテキスト選択を無効化し、アプリライクに */
-            -webkit-user-select: none;
-            user-select: none;
         }
         .glass {
             background: rgba(15, 23, 42, 0.8);
@@ -419,18 +402,18 @@
         const pos = getPos(e);
         lastX = pos.x; lastY = pos.y;
         
-        if (currentTool === 'dot') {
-            drawPoints(pos.x, pos.y, pos.x, pos.y);
-        }
+        // 修正: 最初のタッチでも描画
+        drawPoints(pos.x, pos.y, pos.x, pos.y);
     }
 
     function handleMove(e) {
         if (!isDrawing) return;
         e.preventDefault();
         const pos = getPos(e);
-        if (currentTool !== 'dot') {
-            drawPoints(lastX, lastY, pos.x, pos.y);
-        }
+        
+        // 修正: ドットツールでもドラッグ中連続して描画可能に
+        drawPoints(lastX, lastY, pos.x, pos.y);
+        
         lastX = pos.x; lastY = pos.y;
     }
 
@@ -475,9 +458,11 @@
     function drawSegment(x1, y1, x2, y2) {
         ctx.beginPath();
         if (currentTool === 'dot') {
+            // ドットツール
             ctx.arc(x2, y2, ctx.lineWidth/2, 0, Math.PI*2);
             ctx.fill();
         } else {
+            // ペン / 消しゴム
             ctx.moveTo(x1, y1);
             ctx.lineTo(x2, y2);
             ctx.stroke();
