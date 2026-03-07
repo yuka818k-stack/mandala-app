@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <!-- iOS / iPad Web App (PWA) Settings -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Mandala">
+    
+    <!-- Apple Touch Icon (Auto-generated Base64 SVG) -->
+    <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNTYgMjU2Ij48cmVjdCB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgZmlsbD0iIzBmMTcydGEiLz48Y2lyY2xlIGN4PSIxMjgiIGN5PSIxMjgiIHI9IjgwIiBmaWxsPSJub25lIiBzdHJva2U9IiMzOGJkZjgiIHN0cm9rZS13aWR0aD0iNCIvPjxjaXJjbGUgY3g9IjEyOCIgY3k9IjEyOCIgcj0iNDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzM4YmRmOCIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9zdmc+">
+
+    <title>Akashic Mandala Canvas Pro + Gemini</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #05070a;
+            color: #e2e8f0;
+            overflow: hidden;
+            touch-action: none;
+            /* iPadのノッチやホームインジケーター領域を確保 */
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
+            /* 長押しによるテキスト選択を無効化し、アプリライクに */
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        .glass {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .canvas-container {
+            position: relative;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+        }
+        canvas {
+            border-radius: 50%;
+        }
+        #guideCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            pointer-events: none;
+            transition: opacity 0.4s ease-in-out;
+        }
+        #mandalaCanvas {
+            position: relative;
+            z-index: 10;
+            cursor: crosshair;
+            background: transparent;
+        }
+        input[type="range"] {
+            accent-color: #38bdf8;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #38bdf8;
+            cursor: pointer;
+        }
+        select {
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            color: #38bdf8;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            outline: none;
+        }
+        .btn-toggle {
+            transition: all 0.2s;
+        }
+        .btn-toggle.active {
+            background-color: #0284c7;
+            color: white;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+        }
+        .loading-dots:after {
+            content: '.';
+            animation: dots 1s steps(5, end) infinite;
+        }
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60% { content: '...'; }
+            80%, 100% { content: ''; }
+        }
+    </style>
+</head>
+<body class="flex flex-col md:flex-row h-screen font-sans">
+
+    <!-- サイドバーコントロール -->
+    <aside class="glass w-full md:w-96 p-6 flex flex-col gap-4 z-20 order-2 md:order-1 overflow-y-auto">
+        <div>
+            <h1 class="text-2xl font-light tracking-widest text-sky-400 mb-1 text-center md:text-left">AKASHIC</h1>
+            <p class="text-xs text-slate-500 tracking-tighter uppercase font-bold text-center md:text-left">Mandala Pro & Oracle</p>
+        </div>
+
+        <div class="space-y-4">
+            <!-- 描画ツール -->
+            <div class="p-3 rounded-xl bg-slate-900/50 border border-white/5 space-y-3">
+                <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">描画ツール</label>
+                <div class="grid grid-cols-3 gap-2">
+                    <button id="toolPen" class="btn-toggle active py-2 rounded-lg bg-slate-800 text-xs flex flex-col items-center gap-1">
+                        <span class="text-lg">🖋️</span> ペン
+                    </button>
+                    <button id="toolDot" class="btn-toggle py-2 rounded-lg bg-slate-800 text-xs flex flex-col items-center gap-1">
+                        <span class="text-lg">🔘</span> ドット
+                    </button>
+                    <button id="toolEraser" class="btn-toggle py-2 rounded-lg bg-slate-800 text-xs flex flex-col items-center gap-1">
+                        <span class="text-lg">🧽</span> 消去
+                    </button>
+                </div>
+                <button id="undoBtn" class="w-full py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs flex items-center justify-center gap-2 border border-white/5 transition-all">
+                    <span>↩️</span> 一つ前に戻る (Undo)
+                </button>
+            </div>
+
+            <!-- 設定オプション -->
+            <div class="grid grid-cols-2 gap-3">
+                <div class="p-3 rounded-xl bg-slate-900/50 border border-white/5 space-y-1">
+                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">シンメトリー</label>
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" id="symmetryToggle" checked class="w-4 h-4 accent-sky-500">
+                        <span class="text-[10px] text-slate-300">有効</span>
+                    </div>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-900/50 border border-white/5 space-y-1 text-right">
+                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">鏡像モード</label>
+                    <div class="flex justify-end items-center gap-2">
+                        <span class="text-[10px] text-slate-300">有効</span>
+                        <input type="checkbox" id="mirrorToggle" checked class="w-4 h-4 accent-sky-500">
+                    </div>
+                </div>
+            </div>
+
+            <!-- ガイドライン設定 -->
+            <div class="p-3 rounded-xl bg-slate-900/50 border border-sky-500/10 space-y-3 shadow-inner">
+                <div class="flex items-center justify-between">
+                    <label class="text-[10px] font-bold text-sky-400 uppercase tracking-widest">下絵ガイド</label>
+                    <input type="checkbox" id="guideToggle" checked class="w-4 h-4 accent-sky-500">
+                </div>
+                <div class="flex flex-col gap-1">
+                    <select id="guideType" class="w-full text-[10px]">
+                        <option value="horoscope">ホロスコープ (12分割)</option>
+                        <option value="flower">フラワー・オブ・ライフ</option>
+                        <option value="seed">シード・オブ・ライフ</option>
+                    </select>
+                </div>
+                <div class="space-y-1">
+                    <div class="flex justify-between items-center">
+                        <span class="text-[10px] text-slate-500 italic">Opacity</span>
+                        <span id="guideAlphaVal" class="text-[10px] text-sky-500">0.2</span>
+                    </div>
+                    <input type="range" id="guideAlphaSlider" min="0" max="1" step="0.1" value="0.2" class="w-full">
+                </div>
+            </div>
+
+            <!-- ブラシ設定 -->
+            <div class="grid grid-cols-2 gap-3">
+                <div class="flex flex-col gap-2">
+                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">色彩</label>
+                    <div class="flex items-center gap-2">
+                        <input type="color" id="colorPicker" value="#00f2ff" class="w-8 h-8 bg-transparent border-none cursor-pointer">
+                        <span id="colorHex" class="text-[9px] font-mono text-slate-400">#00F2FF</span>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-2">
+                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">太さ: <span id="sizeVal">5</span></label>
+                    <input type="range" id="sizeSlider" min="1" max="50" value="5" class="w-full">
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-2">
+                <div class="flex justify-between items-center">
+                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">分割数</label>
+                    <span id="divVal" class="text-xs text-sky-400 font-mono">12</span>
+                </div>
+                <input type="range" id="divSlider" min="2" max="36" step="2" value="12" class="w-full">
+            </div>
+
+            <hr class="border-white/10 my-1">
+
+            <!-- Gemini Oracle -->
+            <div class="space-y-2">
+                <label class="text-[10px] font-bold text-sky-500 uppercase tracking-widest">✨ Gemini Oracle</label>
+                <div class="flex gap-2">
+                    <input type="text" id="inspirationQuery" placeholder="気分を言葉に..." 
+                           class="flex-1 bg-slate-900/80 border border-white/10 rounded-lg p-2 text-xs focus:outline-none focus:border-sky-500 transition-colors text-white">
+                    <button id="inspirationBtn" class="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold transition-all active:scale-95">
+                        啓示
+                    </button>
+                </div>
+                <button id="analyzeBtn" class="w-full py-2 rounded-lg bg-fuchsia-600 hover:bg-fuchsia-500 text-white text-[10px] font-bold transition-all active:scale-95">
+                    ✨ 魂の解析
+                </button>
+            </div>
+        </div>
+
+        <!-- AI Response Area -->
+        <div id="aiResponse" class="hidden mt-2 p-3 rounded-xl bg-sky-950/30 border border-sky-500/20 text-[10px] leading-relaxed text-sky-100 overflow-y-auto max-h-32">
+            <div id="aiText"></div>
+        </div>
+
+        <div class="mt-auto pt-4 flex gap-2">
+            <button id="clearBtn" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-all active:scale-95">
+                浄化 (Clear)
+            </button>
+            <button id="saveBtn" class="flex-[2] py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg shadow-sky-900/20 transition-all active:scale-95">
+                真実を記録 (Save)
+            </button>
+        </div>
+    </aside>
+
+    <!-- キャンバスエリア -->
+    <main class="flex-1 relative flex items-center justify-center order-1 md:order-2 p-4 overflow-hidden bg-radial-gradient">
+        <div class="absolute w-[85vmin] h-[85vmin] rounded-full border border-sky-500/5 bg-slate-950/20 pointer-events-none"></div>
+        
+        <div class="canvas-container" id="canvasFrame">
+            <canvas id="guideCanvas"></canvas>
+            <canvas id="mandalaCanvas"></canvas>
+        </div>
+        
+        <div id="loadingOverlay" class="hidden absolute inset-0 bg-black/60 flex items-center justify-center z-[100]">
+            <div class="text-sky-400 font-mono tracking-widest text-lg animate-pulse loading-dots text-center px-4 font-bold uppercase">Communing</div>
+        </div>
+
+        <div id="saveModal" class="hidden absolute inset-0 bg-black/90 flex items-center justify-center z-[200] p-4">
+            <div class="bg-slate-900 p-6 rounded-2xl border border-white/10 max-w-md w-full flex flex-col gap-4 shadow-2xl">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-sky-400 font-bold italic">Cosmic Record</h3>
+                    <button id="closeModal" class="text-slate-500 hover:text-white text-2xl">&times;</button>
+                </div>
+                <div class="aspect-square w-full bg-black rounded-lg overflow-hidden border border-white/10">
+                    <img id="savePreview" class="w-full h-full object-contain" alt="Saved Mandala">
+                </div>
+                <p class="text-[10px] text-slate-400 text-center uppercase tracking-tighter">Long press or right click to download</p>
+                <div class="flex gap-2">
+                    <button id="shareBtn" class="hidden flex-1 py-3 rounded-lg bg-indigo-600 text-white text-xs font-bold">共有</button>
+                    <a id="downloadLink" href="#" download="mandala.png" class="flex-1 py-3 rounded-lg bg-sky-600 text-white text-xs font-bold text-center">ダウンロード</a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+<script>
+    const apiKey = "";
+    const modelName = "gemini-2.5-flash-preview-09-2025";
+
+    async function callGemini(payload) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+        for (let i = 0; i < 5; i++) {
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) throw new Error('API request failed');
+                return await response.json();
+            } catch (error) {
+                await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+            }
+        }
+        throw new Error('Maximum retries exceeded');
+    }
+
+    const canvas = document.getElementById('mandalaCanvas');
+    const ctx = canvas.getContext('2d');
+    const gCanvas = document.getElementById('guideCanvas');
+    const gCtx = gCanvas.getContext('2d');
+    const canvasFrame = document.getElementById('canvasFrame');
+
+    // UI elements
+    const colorPicker = document.getElementById('colorPicker');
+    const colorHex = document.getElementById('colorHex');
+    const sizeSlider = document.getElementById('sizeSlider');
+    const sizeVal = document.getElementById('sizeVal');
+    const divSlider = document.getElementById('divSlider');
+    const divVal = document.getElementById('divVal');
+    
+    const toolPen = document.getElementById('toolPen');
+    const toolDot = document.getElementById('toolDot');
+    const toolEraser = document.getElementById('toolEraser');
+    const undoBtn = document.getElementById('undoBtn');
+    const symmetryToggle = document.getElementById('symmetryToggle');
+    const mirrorToggle = document.getElementById('mirrorToggle');
+    
+    const guideToggle = document.getElementById('guideToggle');
+    const guideType = document.getElementById('guideType');
+    const guideAlphaSlider = document.getElementById('guideAlphaSlider');
+    const guideAlphaVal = document.getElementById('guideAlphaVal');
+    
+    const clearBtn = document.getElementById('clearBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    const inspirationBtn = document.getElementById('inspirationBtn');
+    const inspirationQuery = document.getElementById('inspirationQuery');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const aiResponse = document.getElementById('aiResponse');
+    const aiText = document.getElementById('aiText');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const saveModal = document.getElementById('saveModal');
+    const savePreview = document.getElementById('savePreview');
+    const downloadLink = document.getElementById('downloadLink');
+    const closeModal = document.getElementById('closeModal');
+    const shareBtn = document.getElementById('shareBtn');
+
+    // Drawing State
+    let isDrawing = false;
+    let lastX = 0, lastY = 0;
+    let centerX, centerY;
+    let safeRadius; 
+    let currentTool = 'pen'; // 'pen', 'dot', 'eraser'
+    let drawingHistory = [];
+    const MAX_HISTORY = 20;
+
+    function resizeCanvas() {
+        const container = canvas.parentElement.parentElement;
+        const size = Math.min(container.clientWidth, container.clientHeight) * 0.92;
+        
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = canvas.height;
+        if (canvas.width > 0) tempCanvas.getContext('2d').drawImage(canvas, 0, 0);
+
+        canvasFrame.style.width = size + 'px';
+        canvasFrame.style.height = size + 'px';
+        canvas.width = size;
+        canvas.height = size;
+        gCanvas.width = size;
+        gCanvas.height = size;
+        
+        centerX = canvas.width / 2;
+        centerY = canvas.height / 2;
+        safeRadius = (size / 2) * 0.85; 
+        
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        
+        if (tempCanvas.width > 0) {
+            ctx.drawImage(tempCanvas, (canvas.width - tempCanvas.width)/2, (canvas.height - tempCanvas.height)/2);
+        }
+        drawGuidelines();
+    }
+
+    // --- History / Undo ---
+    function saveHistory() {
+        drawingHistory.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+        if (drawingHistory.length > MAX_HISTORY) drawingHistory.shift();
+    }
+
+    function undo() {
+        if (drawingHistory.length > 0) {
+            const lastState = drawingHistory.pop();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.putImageData(lastState, 0, 0);
+        }
+    }
+
+    // --- Guide Drawing Logic ---
+    function drawGuidelines() {
+        gCtx.clearRect(0, 0, gCanvas.width, gCanvas.height);
+        gCanvas.style.opacity = guideToggle.checked ? "1" : "0";
+        if (!guideToggle.checked) return;
+
+        const alpha = parseFloat(guideAlphaSlider.value);
+        const type = guideType.value;
+        gCtx.strokeStyle = `rgba(56, 189, 248, ${alpha})`;
+        gCtx.lineWidth = 1;
+
+        if (type === 'horoscope') {
+            gCtx.setLineDash([5, 5]);
+            for (let i = 1; i <= 6; i++) {
+                gCtx.beginPath();
+                gCtx.arc(centerX, centerY, (safeRadius / 6) * i, 0, Math.PI * 2);
+                gCtx.stroke();
+            }
+            gCtx.setLineDash([]);
+            for (let i = 0; i < 12; i++) {
+                const a = (i * 2 * Math.PI) / 12;
+                gCtx.beginPath(); gCtx.moveTo(centerX, centerY);
+                gCtx.lineTo(centerX + Math.cos(a) * safeRadius, centerY + Math.sin(a) * safeRadius);
+                gCtx.stroke();
+            }
+        } else if (type === 'flower' || type === 'seed') {
+            const layers = type === 'flower' ? 3 : 1;
+            const unitR = safeRadius / (layers + 1);
+            const drawC = (x, y) => { gCtx.beginPath(); gCtx.arc(x, y, unitR, 0, Math.PI * 2); gCtx.stroke(); };
+            drawC(centerX, centerY);
+            for (let l = 1; l <= layers; l++) {
+                for (let i = 0; i < 6; i++) {
+                    const a = (i * Math.PI) / 3;
+                    const sx = centerX + Math.cos(a) * unitR * l;
+                    const sy = centerY + Math.sin(a) * unitR * l;
+                    drawC(sx, sy);
+                    if (l > 1) {
+                        const na = ((i + 1) * Math.PI) / 3;
+                        for (let s = 1; s < l; s++) {
+                            drawC(sx + (centerX + Math.cos(na) * unitR * l - sx) * (s / l), sy + (centerY + Math.sin(na) * unitR * l - sy) * (s / l));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // --- Drawing Handlers ---
+    function handleStart(e) {
+        saveHistory();
+        isDrawing = true;
+        const pos = getPos(e);
+        lastX = pos.x; lastY = pos.y;
+        
+        if (currentTool === 'dot') {
+            drawPoints(pos.x, pos.y, pos.x, pos.y);
+        }
+    }
+
+    function handleMove(e) {
+        if (!isDrawing) return;
+        e.preventDefault();
+        const pos = getPos(e);
+        if (currentTool !== 'dot') {
+            drawPoints(lastX, lastY, pos.x, pos.y);
+        }
+        lastX = pos.x; lastY = pos.y;
+    }
+
+    function drawPoints(x1, y1, x2, y2) {
+        const color = colorPicker.value;
+        const size = parseInt(sizeSlider.value);
+        const isSym = symmetryToggle.checked;
+        const divisions = isSym ? parseInt(divSlider.value) : 1;
+        const useMirror = mirrorToggle.checked;
+
+        ctx.save();
+        if (currentTool === 'eraser') {
+            ctx.globalCompositeOperation = 'destination-out';
+        } else {
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.shadowBlur = size * 0.7;
+            ctx.shadowColor = color;
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+        }
+        ctx.lineWidth = size;
+
+        const rx1 = x1 - centerX, ry1 = y1 - centerY;
+        const rx2 = x2 - centerX, ry2 = y2 - centerY;
+
+        for (let i = 0; i < divisions; i++) {
+            const angle = (i * 2 * Math.PI) / divisions;
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(angle);
+            
+            drawSegment(rx1, ry1, rx2, ry2);
+            if (useMirror && isSym) {
+                ctx.scale(1, -1);
+                drawSegment(rx1, ry1, rx2, ry2);
+            }
+            ctx.restore();
+        }
+        ctx.restore();
+    }
+
+    function drawSegment(x1, y1, x2, y2) {
+        ctx.beginPath();
+        if (currentTool === 'dot') {
+            ctx.arc(x2, y2, ctx.lineWidth/2, 0, Math.PI*2);
+            ctx.fill();
+        } else {
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+        }
+    }
+
+    function getPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+
+    // UI Logic
+    function setActiveTool(tool, btn) {
+        currentTool = tool;
+        [toolPen, toolDot, toolEraser].forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    }
+
+    toolPen.onclick = () => setActiveTool('pen', toolPen);
+    toolDot.onclick = () => setActiveTool('dot', toolDot);
+    toolEraser.onclick = () => setActiveTool('eraser', toolEraser);
+    undoBtn.onclick = undo;
+
+    colorPicker.oninput = (e) => colorHex.textContent = e.target.value.toUpperCase();
+    sizeSlider.oninput = (e) => { sizeVal.textContent = e.target.value; };
+    divSlider.oninput = (e) => { divVal.textContent = e.target.value; };
+    guideToggle.onchange = drawGuidelines;
+    guideType.onchange = drawGuidelines;
+    guideAlphaSlider.oninput = (e) => { guideAlphaVal.textContent = e.target.value; drawGuidelines(); };
+
+    // Gemini Integration
+    inspirationBtn.onclick = async () => {
+        const query = inspirationQuery.value.trim();
+        if (!query) return;
+        loadingOverlay.classList.remove('hidden');
+        try {
+            const systemPrompt = "You are a cosmic design oracle. suggest mandala parameters in JSON format: { 'color': '#hex', 'size': number(1-50), 'divisions': even_number(4-36), 'message': 'Short poetic message in Japanese' }.";
+            const result = await callGemini({
+                contents: [{ parts: [{ text: query }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: { responseMimeType: "application/json" }
+            });
+            const data = JSON.parse(result.candidates[0].content.parts[0].text);
+            colorPicker.value = data.color;
+            colorHex.textContent = data.color.toUpperCase();
+            sizeSlider.value = data.size; sizeVal.textContent = data.size;
+            divSlider.value = data.divisions; divVal.textContent = data.divisions;
+            aiResponse.classList.remove('hidden');
+            aiText.innerHTML = `<strong>Oracle:</strong> ${data.message}`;
+        } catch (e) { aiText.textContent = "宇宙との接続に失敗しました。"; }
+        finally { loadingOverlay.classList.add('hidden'); }
+    };
+
+    analyzeBtn.onclick = async () => {
+        const pixelData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        if (!pixelData.some(p => p !== 0)) { aiResponse.classList.remove('hidden'); aiText.textContent = "魂を投影してください。"; return; }
+        loadingOverlay.classList.remove('hidden');
+        try {
+            const result = await callGemini({
+                contents: [{
+                    role: "user",
+                    parts: [
+                        { text: "Analyze this mandala and provide a mystical interpretation in Japanese." },
+                        { inlineData: { mimeType: "image/png", data: canvas.toDataURL('image/png').split(',')[1] } }
+                    ]
+                }]
+            });
+            aiResponse.classList.remove('hidden');
+            aiText.innerHTML = `<strong>解析:</strong><br>${result.candidates[0].content.parts[0].text.replace(/\n/g, '<br>')}`;
+        } catch (e) { aiText.textContent = "解析に失敗しました。"; }
+        finally { loadingOverlay.classList.add('hidden'); }
+    };
+
+    saveBtn.onclick = () => {
+        const saveCanvas = document.createElement('canvas');
+        saveCanvas.width = canvas.width; saveCanvas.height = canvas.height;
+        const sCtx = saveCanvas.getContext('2d');
+        sCtx.fillStyle = '#05070a'; sCtx.fillRect(0, 0, saveCanvas.width, saveCanvas.height);
+        sCtx.drawImage(canvas, 0, 0);
+        saveCanvas.toBlob((blob) => {
+            const url = URL.createObjectURL(blob);
+            savePreview.src = url;
+            downloadLink.href = url;
+            downloadLink.download = `mandala_${Date.now()}.png`;
+            if (navigator.share) {
+                shareBtn.classList.remove('hidden');
+                shareBtn.onclick = () => navigator.share({ files: [new File([blob], "mandala.png", {type: "image/png"})], title: 'My Mandala' });
+            }
+            saveModal.classList.remove('hidden');
+        }, 'image/png');
+    };
+
+    closeModal.onclick = () => saveModal.classList.add('hidden');
+    clearBtn.onclick = () => { if(confirm('浄化しますか？')) { saveHistory(); ctx.clearRect(0, 0, canvas.width, canvas.height); } };
+
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    canvas.addEventListener('mousedown', handleStart);
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', () => isDrawing = false);
+    canvas.addEventListener('touchstart', handleStart, {passive: false});
+    window.addEventListener('touchmove', handleMove, {passive: false});
+    window.addEventListener('touchend', () => isDrawing = false);
+
+</script>
+</body>
+</html>
