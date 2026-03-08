@@ -49,14 +49,28 @@
             background: #38bdf8;
             cursor: pointer;
         }
-        select {
+        .guide-list {
             background: rgba(15, 23, 42, 0.9);
             border: 1px solid rgba(56, 189, 248, 0.3);
+            border-radius: 8px;
+            max-height: 120px;
+            overflow-y: auto;
+            padding: 8px;
+        }
+        .guide-item {
+            display: flex;
+            items: center;
+            gap: 8px;
+            padding: 4px 0;
+            font-size: 11px;
+            color: #94a3b8;
+            cursor: pointer;
+        }
+        .guide-item:hover {
             color: #38bdf8;
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-size: 12px;
-            outline: none;
+        }
+        .guide-item input {
+            cursor: pointer;
         }
         .btn-toggle {
             transition: all 0.2s;
@@ -125,19 +139,17 @@
                 </div>
             </div>
 
-            <!-- ガイドライン設定 -->
+            <!-- ガイドライン設定 (複合対応) -->
             <div class="p-3 rounded-xl bg-slate-900/50 border border-sky-500/10 space-y-3 shadow-inner">
                 <div class="flex items-center justify-between">
-                    <label class="text-[10px] font-bold text-sky-400 uppercase tracking-widest">下絵ガイド</label>
+                    <label class="text-[10px] font-bold text-sky-400 uppercase tracking-widest">下絵ガイド（複数選択可）</label>
                     <input type="checkbox" id="guideToggle" checked class="w-4 h-4 accent-sky-500">
                 </div>
-                <div class="flex flex-col gap-1">
-                    <select id="guideType" class="w-full text-[10px]">
-                        <option value="horoscope">ホロスコープ (12分割)</option>
-                        <option value="flower">フラワー・オブ・ライフ</option>
-                        <option value="seed">シード・オブ・ライフ</option>
-                    </select>
+                
+                <div id="guideContainer" class="guide-list space-y-1">
+                    <!-- JSで動的に生成 -->
                 </div>
+
                 <div class="space-y-1">
                     <div class="flex justify-between items-center">
                         <span class="text-[10px] text-slate-500 italic">Opacity</span>
@@ -278,7 +290,7 @@
     const mirrorToggle = document.getElementById('mirrorToggle');
     
     const guideToggle = document.getElementById('guideToggle');
-    const guideType = document.getElementById('guideType');
+    const guideContainer = document.getElementById('guideContainer');
     const guideAlphaSlider = document.getElementById('guideAlphaSlider');
     const guideAlphaVal = document.getElementById('guideAlphaVal');
     
@@ -296,12 +308,42 @@
     const closeModal = document.getElementById('closeModal');
     const shareBtn = document.getElementById('shareBtn');
 
+    // 下絵ガイドの定義
+    const guideDefinitions = [
+        { id: 'horoscope', name: 'ホロスコープ (12分割)', default: true },
+        { id: 'flower', name: 'フラワー・オブ・ライフ', default: false },
+        { id: 'seed', name: 'シード・オブ・ライフ', default: false },
+        { id: 'metatron', name: 'メタトロン・キューブ', default: false },
+        { id: 'torus', name: 'チューブ・トーラス', default: false },
+        { id: 'octagram', name: 'オクタグラム (8芒星)', default: false },
+        { id: 'flower12', name: '12花弁の生命の紋章', default: false },
+        { id: 'shriyantra', name: 'シュリ・ヤントラ (簡易)', default: false },
+        { id: 'spiral', name: '黄金螺旋 (Fibonacci)', default: false },
+        { id: 'pentagram', name: '五芒星 (Pentagram)', default: false },
+        { id: 'hexagram', name: '六芒星 (Hexagram)', default: false }
+    ];
+
+    // ガイドのチェックボックス生成
+    function initGuideList() {
+        guideDefinitions.forEach(guide => {
+            const label = document.createElement('label');
+            label.className = 'guide-item';
+            label.innerHTML = `
+                <input type="checkbox" value="${guide.id}" class="guide-checkbox" ${guide.default ? 'checked' : ''}>
+                <span>${guide.name}</span>
+            `;
+            guideContainer.appendChild(label);
+            
+            label.querySelector('input').addEventListener('change', drawGuidelines);
+        });
+    }
+
     // Drawing State
     let isDrawing = false;
     let lastX = 0, lastY = 0;
     let centerX, centerY;
     let safeRadius; 
-    let currentTool = 'pen'; // 'pen', 'dot', 'eraser'
+    let currentTool = 'pen'; 
     let drawingHistory = [];
     const MAX_HISTORY = 20;
 
@@ -334,7 +376,6 @@
         drawGuidelines();
     }
 
-    // --- History / Undo ---
     function saveHistory() {
         drawingHistory.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
         if (drawingHistory.length > MAX_HISTORY) drawingHistory.shift();
@@ -348,23 +389,12 @@
         }
     }
 
-    // --- Guide Drawing Logic ---
-    function drawGuidelines() {
-        gCtx.clearRect(0, 0, gCanvas.width, gCanvas.height);
-        gCanvas.style.opacity = guideToggle.checked ? "1" : "0";
-        if (!guideToggle.checked) return;
-
-        const alpha = parseFloat(guideAlphaSlider.value);
-        const type = guideType.value;
-        gCtx.strokeStyle = `rgba(56, 189, 248, ${alpha})`;
-        gCtx.lineWidth = 1;
-
-        if (type === 'horoscope') {
+    // 各幾何学模様の描画ロジックを分離
+    const drawPatterns = {
+        horoscope: () => {
             gCtx.setLineDash([5, 5]);
             for (let i = 1; i <= 6; i++) {
-                gCtx.beginPath();
-                gCtx.arc(centerX, centerY, (safeRadius / 6) * i, 0, Math.PI * 2);
-                gCtx.stroke();
+                gCtx.beginPath(); gCtx.arc(centerX, centerY, (safeRadius / 6) * i, 0, Math.PI * 2); gCtx.stroke();
             }
             gCtx.setLineDash([]);
             for (let i = 0; i < 12; i++) {
@@ -373,12 +403,12 @@
                 gCtx.lineTo(centerX + Math.cos(a) * safeRadius, centerY + Math.sin(a) * safeRadius);
                 gCtx.stroke();
             }
-        } else if (type === 'flower' || type === 'seed') {
-            const layers = type === 'flower' ? 3 : 1;
-            const unitR = safeRadius / (layers + 1);
+        },
+        flower: () => {
+            const unitR = safeRadius / 4;
             const drawC = (x, y) => { gCtx.beginPath(); gCtx.arc(x, y, unitR, 0, Math.PI * 2); gCtx.stroke(); };
             drawC(centerX, centerY);
-            for (let l = 1; l <= layers; l++) {
+            for (let l = 1; l <= 3; l++) {
                 for (let i = 0; i < 6; i++) {
                     const a = (i * Math.PI) / 3;
                     const sx = centerX + Math.cos(a) * unitR * l;
@@ -392,7 +422,143 @@
                     }
                 }
             }
+        },
+        seed: () => {
+            const unitR = safeRadius / 2;
+            const drawC = (x, y) => { gCtx.beginPath(); gCtx.arc(x, y, unitR, 0, Math.PI * 2); gCtx.stroke(); };
+            drawC(centerX, centerY);
+            for (let i = 0; i < 6; i++) {
+                const a = (i * Math.PI) / 3;
+                drawC(centerX + Math.cos(a) * unitR, centerY + Math.sin(a) * unitR);
+            }
+        },
+        metatron: () => {
+            const unitR = safeRadius / 4;
+            const centers = [{x: centerX, y: centerY}];
+            const drawC = (x, y) => { gCtx.beginPath(); gCtx.arc(x, y, unitR, 0, Math.PI * 2); gCtx.stroke(); };
+            drawC(centerX, centerY);
+            for (let i = 0; i < 6; i++) {
+                const a = (i * Math.PI) / 3;
+                centers.push({x: centerX + Math.cos(a) * unitR * 2, y: centerY + Math.sin(a) * unitR * 2});
+                drawC(centers[centers.length-1].x, centers[centers.length-1].y);
+                const x2 = centerX + Math.cos(a) * unitR * 4;
+                const y2 = centerY + Math.sin(a) * unitR * 4;
+                if (Math.hypot(x2-centerX, y2-centerY) <= safeRadius + 5) {
+                    centers.push({x: x2, y: y2}); drawC(x2, y2);
+                }
+            }
+            gCtx.lineWidth = 0.5;
+            for(let i=0; i<centers.length; i++) {
+                for(let j=i+1; j<centers.length; j++) {
+                    gCtx.beginPath(); gCtx.moveTo(centers[i].x, centers[i].y);
+                    gCtx.lineTo(centers[j].x, centers[j].y); gCtx.stroke();
+                }
+            }
+        },
+        torus: () => {
+            const count = 36;
+            const ringR = safeRadius * 0.5;
+            for(let i=0; i<count; i++) {
+                const a = (i * Math.PI * 2) / count;
+                gCtx.beginPath();
+                gCtx.arc(centerX + Math.cos(a) * ringR, centerY + Math.sin(a) * ringR, ringR, 0, Math.PI * 2);
+                gCtx.stroke();
+            }
+        },
+        octagram: () => {
+            const drawSquare = (rot) => {
+                gCtx.beginPath();
+                for(let i=0; i<4; i++){
+                    const a = (i * Math.PI / 2) + rot;
+                    const px = centerX + Math.cos(a) * safeRadius;
+                    const py = centerY + Math.sin(a) * safeRadius;
+                    if(i===0) gCtx.moveTo(px, py); else gCtx.lineTo(px, py);
+                }
+                gCtx.closePath(); gCtx.stroke();
+            };
+            drawSquare(0); drawSquare(Math.PI/4);
+            gCtx.beginPath(); gCtx.arc(centerX, centerY, safeRadius, 0, Math.PI*2); gCtx.stroke();
+        },
+        flower12: () => {
+            const unitR = safeRadius * 0.6;
+            for(let i=0; i<12; i++){
+                const a = (i * Math.PI * 2) / 12;
+                gCtx.beginPath(); 
+                gCtx.arc(centerX + Math.cos(a) * (unitR * 0.8), centerY + Math.sin(a) * (unitR * 0.8), unitR, 0, Math.PI * 2); 
+                gCtx.stroke();
+            }
+        },
+        shriyantra: () => {
+            const sizes = [1, 0.8, 0.6, 0.4];
+            sizes.forEach((s, idx) => {
+                const r = safeRadius * s;
+                const rot = (idx % 2 === 0) ? -Math.PI/2 : Math.PI/2;
+                gCtx.beginPath();
+                for(let i=0; i<3; i++){
+                    const a = (i * 2 * Math.PI / 3) + rot;
+                    const px = centerX + Math.cos(a) * r;
+                    const py = centerY + Math.sin(a) * r;
+                    if(i===0) gCtx.moveTo(px, py); else gCtx.lineTo(px, py);
+                }
+                gCtx.closePath(); gCtx.stroke();
+            });
+            gCtx.beginPath(); gCtx.arc(centerX, centerY, safeRadius, 0, Math.PI*2); gCtx.stroke();
+        },
+        spiral: () => {
+            let x = centerX, y = centerY;
+            let a = 0; let r = 2;
+            gCtx.beginPath(); gCtx.moveTo(x, y);
+            for (let i = 0; i < 500; i++) {
+                a += 0.1; r *= 1.005;
+                const nx = centerX + Math.cos(a) * r;
+                const ny = centerY + Math.sin(a) * r;
+                if (Math.hypot(nx-centerX, ny-centerY) > safeRadius) break;
+                gCtx.lineTo(nx, ny);
+            }
+            gCtx.stroke();
+        },
+        pentagram: () => {
+            const pts = [];
+            for (let i = 0; i < 5; i++) {
+                const a = (i * 2 * Math.PI) / 5 - Math.PI / 2;
+                pts.push({x: centerX + Math.cos(a) * safeRadius, y: centerY + Math.sin(a) * safeRadius});
+            }
+            gCtx.beginPath(); gCtx.moveTo(pts[0].x, pts[0].y); gCtx.lineTo(pts[2].x, pts[2].y);
+            gCtx.lineTo(pts[4].x, pts[4].y); gCtx.lineTo(pts[1].x, pts[1].y);
+            gCtx.lineTo(pts[3].x, pts[3].y); gCtx.closePath(); gCtx.stroke();
+            gCtx.beginPath(); gCtx.arc(centerX, centerY, safeRadius, 0, Math.PI*2); gCtx.stroke();
+        },
+        hexagram: () => {
+            const tri = (rot) => {
+                gCtx.beginPath();
+                for (let i = 0; i < 3; i++) {
+                    const a = (i * 2 * Math.PI) / 3 + rot;
+                    const px = centerX + Math.cos(a) * safeRadius;
+                    const py = centerY + Math.sin(a) * safeRadius;
+                    if (i === 0) gCtx.moveTo(px, py); else gCtx.lineTo(px, py);
+                }
+                gCtx.closePath(); gCtx.stroke();
+            };
+            tri(-Math.PI / 2); tri(Math.PI / 2);
+            gCtx.beginPath(); gCtx.arc(centerX, centerY, safeRadius, 0, Math.PI*2); gCtx.stroke();
         }
+    };
+
+    // --- ガイドの描画実行 (複数対応) ---
+    function drawGuidelines() {
+        gCtx.clearRect(0, 0, gCanvas.width, gCanvas.height);
+        gCanvas.style.opacity = guideToggle.checked ? "1" : "0";
+        if (!guideToggle.checked) return;
+
+        const alpha = parseFloat(guideAlphaSlider.value);
+        gCtx.strokeStyle = `rgba(56, 189, 248, ${alpha})`;
+        gCtx.lineWidth = 1;
+
+        // チェックされているすべてのパターンを描画
+        const activeGuides = Array.from(document.querySelectorAll('.guide-checkbox:checked')).map(cb => cb.value);
+        activeGuides.forEach(id => {
+            if (drawPatterns[id]) drawPatterns[id]();
+        });
     }
 
     // --- Drawing Handlers ---
@@ -401,8 +567,6 @@
         isDrawing = true;
         const pos = getPos(e);
         lastX = pos.x; lastY = pos.y;
-        
-        // 修正: 最初のタッチでも描画
         drawPoints(pos.x, pos.y, pos.x, pos.y);
     }
 
@@ -410,10 +574,7 @@
         if (!isDrawing) return;
         e.preventDefault();
         const pos = getPos(e);
-        
-        // 修正: ドットツールでもドラッグ中連続して描画可能に
         drawPoints(lastX, lastY, pos.x, pos.y);
-        
         lastX = pos.x; lastY = pos.y;
     }
 
@@ -458,14 +619,10 @@
     function drawSegment(x1, y1, x2, y2) {
         ctx.beginPath();
         if (currentTool === 'dot') {
-            // ドットツール
             ctx.arc(x2, y2, ctx.lineWidth/2, 0, Math.PI*2);
             ctx.fill();
         } else {
-            // ペン / 消しゴム
-            ctx.moveTo(x1, y1);
-            ctx.lineTo(x2, y2);
-            ctx.stroke();
+            ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
         }
     }
 
@@ -492,7 +649,6 @@
     sizeSlider.oninput = (e) => { sizeVal.textContent = e.target.value; };
     divSlider.oninput = (e) => { divVal.textContent = e.target.value; };
     guideToggle.onchange = drawGuidelines;
-    guideType.onchange = drawGuidelines;
     guideAlphaSlider.oninput = (e) => { guideAlphaVal.textContent = e.target.value; drawGuidelines(); };
 
     // Gemini Integration
@@ -508,12 +664,10 @@
                 generationConfig: { responseMimeType: "application/json" }
             });
             const data = JSON.parse(result.candidates[0].content.parts[0].text);
-            colorPicker.value = data.color;
-            colorHex.textContent = data.color.toUpperCase();
+            colorPicker.value = data.color; colorHex.textContent = data.color.toUpperCase();
             sizeSlider.value = data.size; sizeVal.textContent = data.size;
             divSlider.value = data.divisions; divVal.textContent = data.divisions;
-            aiResponse.classList.remove('hidden');
-            aiText.innerHTML = `<strong>Oracle:</strong> ${data.message}`;
+            aiResponse.classList.remove('hidden'); aiText.innerHTML = `<strong>Oracle:</strong> ${data.message}`;
         } catch (e) { aiText.textContent = "宇宙との接続に失敗しました。"; }
         finally { loadingOverlay.classList.add('hidden'); }
     };
@@ -546,8 +700,7 @@
         sCtx.drawImage(canvas, 0, 0);
         saveCanvas.toBlob((blob) => {
             const url = URL.createObjectURL(blob);
-            savePreview.src = url;
-            downloadLink.href = url;
+            savePreview.src = url; downloadLink.href = url;
             downloadLink.download = `mandala_${Date.now()}.png`;
             if (navigator.share) {
                 shareBtn.classList.remove('hidden');
@@ -561,6 +714,7 @@
     clearBtn.onclick = () => { if(confirm('浄化しますか？')) { saveHistory(); ctx.clearRect(0, 0, canvas.width, canvas.height); } };
 
     window.addEventListener('resize', resizeCanvas);
+    initGuideList();
     resizeCanvas();
 
     canvas.addEventListener('mousedown', handleStart);
