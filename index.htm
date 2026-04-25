@@ -1,809 +1,1006 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Akashic Mandala Canvas Pro + Gemini</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body {
-            background-color: #05070a;
-            color: #e2e8f0;
-            overflow: hidden;
-            touch-action: none;
-        }
-        .glass {
-            background: rgba(15, 23, 42, 0.9);
-            backdrop-filter: blur(20px);
-            border-right: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
-        }
-        .canvas-container {
-            position: relative;
-            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        canvas {
-            border-radius: 50%;
-            box-shadow: 0 0 80px rgba(0, 0, 0, 0.9), 0 0 30px rgba(56, 189, 248, 0.08);
-        }
-        #guideCanvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            z-index: 1;
-            pointer-events: none;
-            transition: opacity 0.4s ease-in-out;
-        }
-        #mandalaCanvas {
-            position: relative;
-            z-index: 10;
-            cursor: crosshair;
-            background: transparent;
-        }
-        input[type="range"] {
-            accent-color: #38bdf8;
-        }
-        .guide-list {
-            background: rgba(15, 23, 42, 0.9);
-            border: 1px solid rgba(56, 189, 248, 0.3);
-            border-radius: 8px;
-            max-height: 160px;
-            overflow-y: auto;
-            padding: 8px;
-        }
-        .guide-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 5px 0;
-            font-size: 11px;
-            color: #94a3b8;
-            cursor: pointer;
-            transition: color 0.2s;
-        }
-        .guide-item:hover { color: #38bdf8; }
-        
-        .btn-toggle { transition: all 0.2s; }
-        .btn-toggle.active {
-            background-color: #0284c7;
-            color: white;
-            box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Akashic Mandala Canvas Pro</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+     body {
+        background-color: #05070a;
+        color: #e2e8f0;
+        overflow: hidden;
+        touch-action: none;
+     }
+     .glass {
+        background: rgba(15, 23, 42, 0.9);
+        backdrop-filter: blur(20px);
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
+     }
+     .canvas-container {
+        position: relative;
+        transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        z-index: 10;
+     }
+     canvas.mandala-layer {
+        border-radius: 50%;
+        box-shadow: 0 0 80px rgba(0, 0, 0, 0.9), 0 0 30px rgba(56, 189, 248, 0.08);
+        width: 100%;
+        height: 100%;
+     }
+     #guideCanvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 1;
+        pointer-events: none;
+        transition: opacity 0.4s ease-in-out;
+        border-radius: 50%;
+        width: 100%;
+        height: 100%;
+     }
+     #mandalaCanvas {
+        position: relative;
+        z-index: 10;
+        cursor: crosshair;
+        background: transparent;
+     }
 
-        /* サイドバーアニメーション */
-        #sidebar {
-            transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-            width: 384px; /* 96rem equivalent */
-        }
-        .sidebar-collapsed {
-            width: 0 !important;
-            padding-left: 0 !important;
-            padding-right: 0 !important;
-            transform: translateX(-100%);
-        }
-        
-        #toggleSidebarBtn {
-            position: absolute;
-            left: 100%;
-            top: 50%;
-            transform: translateY(-50%);
-            background: rgba(15, 23, 42, 0.9);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-left: none;
-            padding: 20px 10px;
-            border-radius: 0 12px 12px 0;
-            color: #38bdf8;
-            cursor: pointer;
-            z-index: 100;
-            box-shadow: 5px 0 15px rgba(0,0,0,0.4);
-            font-weight: bold;
-            transition: all 0.3s;
-        }
-        #toggleSidebarBtn:hover {
-            background: rgba(30, 41, 59, 1);
-            color: white;
-            padding-right: 15px;
-        }
+     input[type="range"] {
+        accent-color: #38bdf8;
+     }
+     .guide-list {
+        background: rgba(15, 23, 42, 0.9);
+        border: 1px solid rgba(56, 189, 248, 0.3);
+        border-radius: 8px;
+        max-height: 160px;
+        overflow-y: auto;
+        padding: 8px;
+     }
+     .guide-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 0;
+        font-size: 11px;
+        color: #94a3b8;
+        cursor: pointer;
+        transition: color 0.2s;
+     }
+     .guide-item:hover { color: #38bdf8; }
 
-        .loading-dots:after {
-            content: '.';
-            animation: dots 1s steps(5, end) infinite;
-        }
-        @keyframes dots {
-            0%, 20% { content: '.'; }
-            40% { content: '..'; }
-            60% { content: '...'; }
-            80%, 100% { content: ''; }
-        }
-        
-        .bg-radial-gradient {
-            background: radial-gradient(circle at center, #111b2f 0%, #05070a 100%);
-        }
+     .btn-toggle { transition: all 0.2s; }
+     .btn-toggle.active {
+        background-color: #0284c7;
+        color: white;
+        box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+     }
 
-        /* スクロールバーのカスタマイズ */
-        .guide-list::-webkit-scrollbar {
-            width: 4px;
-        }
-        .guide-list::-webkit-scrollbar-thumb {
-            background: rgba(56, 189, 248, 0.3);
-            border-radius: 10px;
-        }
-    </style>
+     /* サイドバーアニメーション */
+     #sidebar {
+        transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        width: 384px;
+     }
+     .sidebar-collapsed {
+        width: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        transform: translateX(-100%);
+     }
+
+     #toggleSidebarBtn {
+       position: absolute;
+       left: 100%;
+       top: 50%;
+       transform: translateY(-50%);
+       background: rgba(15, 23, 42, 0.9);
+       border: 1px solid rgba(255, 255, 255, 0.1);
+       border-left: none;
+       padding: 20px 10px;
+       border-radius: 0 12px 12px 0;
+       color: #38bdf8;
+       cursor: pointer;
+       z-index: 100;
+       box-shadow: 5px 0 15px rgba(0,0,0,0.4);
+       font-weight: bold;
+       transition: all 0.3s;
+     }
+     #toggleSidebarBtn:hover {
+       background: rgba(30, 41, 59, 1);
+       color: white;
+       padding-right: 15px;
+     }
+
+     .bg-radial-gradient {
+       background: radial-gradient(circle at center, #111b2f 0%, #05070a 100%);
+     }
+
+     /* スクロールバーのカスタマイズ */
+     .guide-list::-webkit-scrollbar, .custom-scroll::-webkit-scrollbar {
+        width: 4px;
+     }
+     .guide-list::-webkit-scrollbar-thumb, .custom-scroll::-webkit-scrollbar-thumb {
+        background: rgba(56, 189, 248, 0.3);
+        border-radius: 10px;
+     }
+
+     /* 視覚エフェクトアニメーションクラス */
+     .animate-pulse-mode {
+        animation: animPulse 30s linear infinite;
+     }
+     .animate-kaleidoscope {
+        animation: animKaleidoscope 20s ease-in-out infinite alternate;
+     }
+     .animate-warp {
+        animation: animWarp 15s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+     }
+
+     @keyframes animPulse {
+       0% { transform: rotate(0deg) scale(1); filter: hue-rotate(0deg); }
+       50% { transform: rotate(180deg) scale(1.05); filter: hue-rotate(180deg) drop-shadow(0 0 20px rgba(255,255,255,0.2)); }
+       100% { transform: rotate(360deg) scale(1); filter: hue-rotate(360deg); }
+     }
+
+     @keyframes animKaleidoscope {
+       0% { transform: rotate(0deg) scale(1); filter: hue-rotate(0deg) contrast(1); }
+       33% { transform: rotate(60deg) scale(1.15); filter: hue-rotate(120deg) contrast(1.4) drop-shadow(0 0 30px rgba(56, 189, 248, 0.5)); }
+       66% { transform: rotate(-30deg) scale(0.9); filter: hue-rotate(240deg) contrast(1.2) drop-shadow(0 0 40px rgba(236, 72, 153, 0.5)); }
+       100% { transform: rotate(90deg) scale(1.25); filter: hue-rotate(360deg) contrast(1.6) drop-shadow(0 0 50px rgba(168, 85, 247, 0.6)); }
+     }
+
+     @keyframes animWarp {
+       0% { transform: perspective(800px) rotateX(0deg) rotateY(0deg) rotateZ(0deg) scale(1); filter: hue-rotate(0deg); }
+       50% { transform: perspective(800px) rotateX(45deg) rotateY(15deg) rotateZ(180deg) scale(1.4); filter: hue-rotate(180deg) blur(1px); opacity: 0.9; }
+       100% { transform: perspective(800px) rotateX(0deg) rotateY(0deg) rotateZ(360deg) scale(1); filter: hue-rotate(360deg); }
+     }
+  </style>
 </head>
 <body class="flex h-screen font-sans overflow-hidden">
 
-    <!-- サイドバー -->
-    <aside id="sidebar" class="glass h-full p-6 flex flex-col gap-4 z-50 relative shrink-0">
-        <button id="toggleSidebarBtn" title="パレットを出し入れ">⚡</button>
-        
-        <div class="mb-2">
-            <h1 class="text-2xl font-light tracking-widest text-sky-400 mb-1">AKASHIC</h1>
-            <p class="text-[10px] text-slate-500 tracking-tighter uppercase font-bold opacity-80">Mandala Pro & Oracle</p>
+  <!-- サイドバー -->
+  <aside id="sidebar" class="glass h-full p-6 flex flex-col gap-4 z-50 relative shrink-0">
+     <button id="toggleSidebarBtn" title="パレットを出し入れ">⚡</button>
+
+    <div class="mb-2">
+       <h1 class="text-2xl font-light tracking-widest text-sky-400 mb-1">AKASHIC</h1>
+       <p class="text-[10px] text-slate-500 tracking-tighter uppercase font-bold opacity-80">Mandala Pro Canvas</p>
+    </div>
+
+      <div class="space-y-4 overflow-y-auto pr-2 custom-scroll flex-1">
+         <!-- 描画ツール -->
+         <div class="p-3 rounded-xl bg-slate-900/50 border border-white/5 space-y-3">
+            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ツール</label>
+            <div class="grid grid-cols-3 gap-2">
+               <button id="toolPen" class="btn-toggle active py-2 rounded-lg bg-slate-800 text-xs flex flex-col items-center gap-1">
+                 <span class="text-lg">🖋️</span> ペン
+               </button>
+               <button id="toolDot" class="btn-toggle py-2 rounded-lg bg-slate-800 text-xs flex flex-col items-center gap-1">
+                 <span class="text-lg">🔘</span> ドット
+               </button>
+               <button id="toolEraser" class="btn-toggle py-2 rounded-lg bg-slate-800 text-xs flex flex-col items-center gap-1">
+                 <span class="text-lg">🧽</span> 消去
+               </button>
+           </div>
+           <button id="undoBtn" class="w-full py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs flex items-center justify-center gap-2 border border-white/5 transition-all active:scale-95">
+               <span>↩️</span> 取り消し (Undo)
+           </button>
+         </div>
+
+       <!-- ガイドライン設定 -->
+       <div class="p-3 rounded-xl bg-slate-900/50 border border-sky-500/10 space-y-3 shadow-inner">
+          <div class="flex items-center justify-between">
+            <label class="text-[10px] font-bold text-sky-400 uppercase tracking-widest">下絵ガイド（複数選択可）</label>
+            <input type="checkbox" id="guideToggle" checked class="w-4 h-4 accent-sky-500">
+          </div>
+
+          <div id="guideContainer" class="guide-list space-y-1"></div>
+
+          <div class="space-y-1">
+            <div class="flex justify-between items-center">
+               <span class="text-[10px] text-slate-500 italic">Opacity</span>
+               <span id="guideAlphaVal" class="text-[10px] text-sky-500">0.2</span>
+            </div>
+            <input type="range" id="guideAlphaSlider" min="0" max="1" step="0.1" value="0.2" class="w-full">
+          </div>
+       </div>
+
+        <!-- ブラシ設定 -->
+        <div class="grid grid-cols-2 gap-3">
+           <div class="flex flex-col gap-2 p-3 rounded-xl bg-slate-900/50 border border-white/5">
+             <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">色彩</label>
+             <div class="flex items-center gap-2">
+                <input type="color" id="colorPicker" value="#00f2ff" class="w-8 h-8 bg-transparent border-none cursor-pointer">
+                <span id="colorHex" class="text-[9px] font-mono text-slate-400">#00F2FF</span>
+             </div>
+           </div>
+
+           <div class="flex flex-col gap-2 p-3 rounded-xl bg-slate-900/50 border border-white/5">
+             <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">太さ: <span id="sizeVal">12</span></label>
+             <input type="range" id="sizeSlider" min="1" max="100" value="12" class="w-full">
+           </div>
         </div>
 
-        <div class="space-y-4 overflow-y-auto pr-2 custom-scroll flex-1">
-            <!-- 描画ツール -->
-            <div class="p-3 rounded-xl bg-slate-900/50 border border-white/5 space-y-3">
-                <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ツール</label>
-                <div class="grid grid-cols-3 gap-2">
-                    <button id="toolPen" class="btn-toggle active py-2 rounded-lg bg-slate-800 text-xs flex flex-col items-center gap-1">
-                        <span class="text-lg">🖋️</span> ペン
-                    </button>
-                    <button id="toolDot" class="btn-toggle py-2 rounded-lg bg-slate-800 text-xs flex flex-col items-center gap-1">
-                        <span class="text-lg">🔘</span> ドット
-                    </button>
-                    <button id="toolEraser" class="btn-toggle py-2 rounded-lg bg-slate-800 text-xs flex flex-col items-center gap-1">
-                        <span class="text-lg">🧽</span> 消去
-                    </button>
-                </div>
-                <button id="undoBtn" class="w-full py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs flex items-center justify-center gap-2 border border-white/5 transition-all active:scale-95">
-                    <span>↩️</span> 取り消し (Undo)
-                </button>
+       <!-- 分割・シンメトリー設定 -->
+       <div class="p-3 rounded-xl bg-slate-900/50 border border-white/5 space-y-2">
+          <div class="flex justify-between items-center">
+             <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">分割数</label>
+             <span id="divVal" class="text-xs text-sky-400 font-mono">12</span>
+          </div>
+          <input type="range" id="divSlider" min="2" max="36" step="2" value="12" class="w-full">
+          <div class="flex justify-between gap-4 pt-1">
+             <div class="flex items-center gap-2">
+                <input type="checkbox" id="symmetryToggle" checked class="w-4 h-4 accent-sky-500">
+                <span class="text-[10px] text-slate-300">シンメトリー</span>
+             </div>
+             <div class="flex items-center gap-2">
+                <input type="checkbox" id="mirrorToggle" checked class="w-4 h-4 accent-sky-500">
+                <span class="text-[10px] text-slate-300">鏡像モード</span>
+             </div>
+          </div>
+       </div>
+
+         <!-- 鑑賞モード (Animation) -->
+         <div class="p-3 rounded-xl bg-slate-900/50 border border-purple-500/20 space-y-3">
+            <label class="text-[10px] font-bold text-purple-400 uppercase tracking-widest">鑑賞モード (Animation)</label>
+            <select id="animMode" class="w-full bg-slate-950 border border-white/10 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-purple-500 transition-colors">
+               <option value="scatter">星屑の分解 (Scatter)</option>
+               <option value="pulse-mode">星の鼓動 (Pulse & Rotate)</option>
+               <option value="kaleidoscope">万華鏡 (Kaleidoscope)</option>
+               <option value="warp">次元跳躍 (Warp Drive)</option>
+            </select>
+            <button id="animateBtn" class="w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-lg shadow-purple-900/20 transition-all active:scale-95 tracking-widest flex items-center justify-center gap-2">
+               <span id="animIcon">✨</span> <span id="animText">命を吹き込む</span>
+          </button>
+       </div>
+     </div>
+
+      <div class="mt-auto pt-2 flex gap-2">
+        <button id="clearBtn" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-all active:scale-95">浄化 (Clear)</button>
+        <button id="saveBtn" class="flex-[2] py-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg shadow-sky-900/20 transition-all active:scale-95">記録 (Save)</button>
+      </div>
+   </aside>
+
+  <!-- キャンバスエリア -->
+  <main class="flex-1 relative flex items-center justify-center bg-radial-gradient p-4 md:p-12 overflow-hidden">
+     <!-- 背景・パーティクル用キャンバス -->
+     <canvas id="particleCanvas" class="absolute inset-0 w-full h-full z-0 pointer-events-none opacity-0 transition-opacity duration-1000"></canvas>
+
+     <div id="canvasFrame" class="canvas-container">
+       <canvas id="guideCanvas" class="mandala-layer"></canvas>
+       <canvas id="mandalaCanvas" class="mandala-layer"></canvas>
+     </div>
+
+       <div id="saveModal" class="hidden absolute inset-0 bg-black/90 flex items-center justify-center z-[200] p-4">
+         <div class="bg-slate-900 p-6 rounded-2xl border border-white/10 max-w-md w-full flex flex-col gap-4 shadow-2xl">
+            <div class="flex justify-between items-center">
+               <h3 class="text-sky-400 font-bold italic tracking-widest">COSMIC RECORD</h3>
+               <button id="closeModal" class="text-slate-500 hover:text-white text-2xl">&times;</button>
             </div>
-
-            <!-- ガイドライン設定 -->
-            <div class="p-3 rounded-xl bg-slate-900/50 border border-sky-500/10 space-y-3 shadow-inner">
-                <div class="flex items-center justify-between">
-                    <label class="text-[10px] font-bold text-sky-400 uppercase tracking-widest">下絵ガイド（複数選択可）</label>
-                    <input type="checkbox" id="guideToggle" checked class="w-4 h-4 accent-sky-500">
-                </div>
-                
-                <div id="guideContainer" class="guide-list space-y-1"></div>
-
-                <div class="space-y-1">
-                    <div class="flex justify-between items-center">
-                        <span class="text-[10px] text-slate-500 italic">Opacity</span>
-                        <span id="guideAlphaVal" class="text-[10px] text-sky-500">0.2</span>
-                    </div>
-                    <input type="range" id="guideAlphaSlider" min="0" max="1" step="0.1" value="0.2" class="w-full">
-                </div>
+            <div class="aspect-square w-full bg-black rounded-lg overflow-hidden border border-white/10 shadow-inner">
+               <img id="savePreview" class="w-full h-full object-contain" alt="Saved Mandala">
             </div>
-
-            <!-- ブラシ設定 -->
-            <div class="grid grid-cols-2 gap-3">
-                <div class="flex flex-col gap-2 p-3 rounded-xl bg-slate-900/50 border border-white/5">
-                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">色彩</label>
-                    <div class="flex items-center gap-2">
-                        <input type="color" id="colorPicker" value="#00f2ff" class="w-8 h-8 bg-transparent border-none cursor-pointer">
-                        <span id="colorHex" class="text-[9px] font-mono text-slate-400">#00F2FF</span>
-                    </div>
-                </div>
-                <div class="flex flex-col gap-2 p-3 rounded-xl bg-slate-900/50 border border-white/5">
-                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">太さ: <span id="sizeVal">5</span></label>
-                    <input type="range" id="sizeSlider" min="1" max="50" value="5" class="w-full">
-                </div>
+            <div class="flex flex-col gap-3 mt-4">
+               <a id="downloadLink" href="#" download="mandala.png" class="w-full py-4 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-sm font-bold text-center transition-all shadow-lg shadow-sky-900/30">記録を保存する</a>
+               <p class="text-[10px] text-slate-500 text-center uppercase tracking-widest italic">The truth is now anchored in your device.</p>
             </div>
-
-            <div class="p-3 rounded-xl bg-slate-900/50 border border-white/5 space-y-2">
-                <div class="flex justify-between items-center">
-                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">分割数</label>
-                    <span id="divVal" class="text-xs text-sky-400 font-mono">12</span>
-                </div>
-                <input type="range" id="divSlider" min="2" max="36" step="2" value="12" class="w-full">
-                <div class="flex justify-between gap-4 pt-1">
-                    <div class="flex items-center gap-2">
-                        <input type="checkbox" id="symmetryToggle" checked class="w-4 h-4 accent-sky-500">
-                        <span class="text-[10px] text-slate-300">シンメトリー</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <input type="checkbox" id="mirrorToggle" checked class="w-4 h-4 accent-sky-500">
-                        <span class="text-[10px] text-slate-300">鏡像モード</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Gemini Oracle -->
-            <div class="p-3 rounded-xl bg-slate-900/50 border border-sky-500/20 space-y-3">
-                <label class="text-[10px] font-bold text-sky-500 uppercase tracking-widest">✨ Gemini Oracle</label>
-                <div class="flex gap-2">
-                    <input type="text" id="inspirationQuery" placeholder="今の気分は..." 
-                           class="flex-1 bg-slate-950 border border-white/10 rounded-lg p-2 text-xs focus:outline-none focus:border-sky-500 transition-colors text-white">
-                    <button id="inspirationBtn" class="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold transition-all active:scale-95">啓示</button>
-                </div>
-                <button id="analyzeBtn" class="w-full py-2 rounded-lg bg-fuchsia-600 hover:bg-fuchsia-500 text-white text-[10px] font-bold transition-all active:scale-95">✨ 魂の解析</button>
-                <div id="aiResponse" class="hidden p-2 rounded-lg bg-sky-950/50 text-[10px] text-sky-100 overflow-y-auto max-h-32 border border-sky-500/10">
-                    <div id="aiText"></div>
-                </div>
-            </div>
-        </div>
-
-        <div class="mt-auto pt-4 flex gap-2">
-            <button id="clearBtn" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-all active:scale-95">浄化 (Clear)</button>
-            <button id="saveBtn" class="flex-[2] py-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg shadow-sky-900/20 transition-all active:scale-95">真実を記録 (Save)</button>
-        </div>
-    </aside>
-
-    <!-- キャンバスエリア -->
-    <main class="flex-1 relative flex items-center justify-center bg-radial-gradient p-4 md:p-12 overflow-hidden">
-        <div id="canvasFrame" class="canvas-container">
-            <canvas id="guideCanvas"></canvas>
-            <canvas id="mandalaCanvas"></canvas>
-        </div>
-        
-        <div id="loadingOverlay" class="hidden absolute inset-0 bg-black/70 flex items-center justify-center z-[100]">
-            <div class="text-sky-400 font-mono tracking-widest text-lg animate-pulse loading-dots text-center px-4 font-bold uppercase">Communing with Cosmos</div>
-        </div>
-
-        <div id="saveModal" class="hidden absolute inset-0 bg-black/90 flex items-center justify-center z-[200] p-4">
-            <div class="bg-slate-900 p-6 rounded-2xl border border-white/10 max-w-md w-full flex flex-col gap-4 shadow-2xl">
-                <div class="flex justify-between items-center">
-                    <h3 class="text-sky-400 font-bold italic tracking-widest">COSMIC RECORD</h3>
-                    <button id="closeModal" class="text-slate-500 hover:text-white text-2xl">&times;</button>
-                </div>
-                <div class="aspect-square w-full bg-black rounded-lg overflow-hidden border border-white/10 shadow-inner">
-                    <img id="savePreview" class="w-full h-full object-contain" alt="Saved Mandala">
-                </div>
-                <div class="flex flex-col gap-3 mt-4">
-                    <a id="downloadLink" href="#" download="mandala.png" class="w-full py-4 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-sm font-bold text-center transition-all shadow-lg shadow-sky-900/30">記録を保存する</a>
-                    <p class="text-[10px] text-slate-500 text-center uppercase tracking-widest italic">The truth is now anchored in your device.</p>
-                </div>
-            </div>
-        </div>
-    </main>
+         </div>
+    </div>
+  </main>
 
 <script>
-    const apiKey = "";
-    const modelName = "gemini-2.5-flash-preview-09-2025";
+  const canvas = document.getElementById('mandalaCanvas');
+  const ctx = canvas.getContext('2d');
+  const gCanvas = document.getElementById('guideCanvas');
+  const gCtx = gCanvas.getContext('2d');
+  const canvasFrame = document.getElementById('canvasFrame');
+  const sidebar = document.getElementById('sidebar');
+  const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
 
-    async function callGemini(payload) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-        for (let i = 0; i < 5; i++) {
-            try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                if (!response.ok) throw new Error('API request failed');
-                return await response.json();
-            } catch (error) {
-                await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+  // パーティクル用キャンバス
+  const pCanvas = document.getElementById('particleCanvas');
+  const pCtx = pCanvas.getContext('2d');
+
+  const colorPicker = document.getElementById('colorPicker');
+  const colorHex = document.getElementById('colorHex');
+  const sizeSlider = document.getElementById('sizeSlider');
+  const sizeVal = document.getElementById('sizeVal');
+  const divSlider = document.getElementById('divSlider');
+  const divVal = document.getElementById('divVal');
+
+  const toolPen = document.getElementById('toolPen');
+  const toolDot = document.getElementById('toolDot');
+  const toolEraser = document.getElementById('toolEraser');
+  const undoBtn = document.getElementById('undoBtn');
+  const symmetryToggle = document.getElementById('symmetryToggle');
+  const mirrorToggle = document.getElementById('mirrorToggle');
+
+  const guideToggle = document.getElementById('guideToggle');
+  const guideContainer = document.getElementById('guideContainer');
+  const guideAlphaSlider = document.getElementById('guideAlphaSlider');
+  const guideAlphaVal = document.getElementById('guideAlphaVal');
+
+  const animMode = document.getElementById('animMode');
+  const animateBtn = document.getElementById('animateBtn');
+  const animIcon = document.getElementById('animIcon');
+  const animText = document.getElementById('animText');
+  const clearBtn = document.getElementById('clearBtn');
+  const saveBtn = document.getElementById('saveBtn');
+  const saveModal = document.getElementById('saveModal');
+  const savePreview = document.getElementById('savePreview');
+  const downloadLink = document.getElementById('downloadLink');
+  const closeModal = document.getElementById('closeModal');
+
+  const guideDefinitions = [
+    { id: 'horoscope', name: 'ホロスコープ (12分割)', default: true },
+    { id: 'fruit', name: 'フルーツ・オブ・ライフ', default: false },
+    { id: 'flower', name: 'フラワー・オブ・ライフ', default: false },
+    { id: 'seed', name: 'シード・オブ・ライフ', default: false },
+    { id: 'metatron', name: 'メタトロン・キューブ', default: false },
+    { id: 'merkaba', name: 'マカバ (Merkaba)', default: false },
+    { id: 'cube', name: '立方体 (Hexahedron)', default: false },
+    { id: 'treeOfLife', name: '生命の樹 (Sephirot)', default: false },
+    { id: 'unicursalHex', name: '一筆書き六芒星', default: false },
+    { id: 'vesica', name: 'ヴェシカ・パイシス', default: false },
+    { id: 'torus', name: 'チューブ・トーラス', default: false },
+    { id: 'octagram', name: 'オクタグラム (8芒星)', default: false },
+    { id: 'flower12', name: '12花弁の生命の紋章', default: false },
+    { id: 'shriyantra', name: 'シュリ・ヤントラ (簡易)', default: false },
+    { id: 'hexagram', name: '六芒星 (Hexagram)', default: false }
+  ];
+
+  function initGuideList() {
+     guideContainer.innerHTML = '';
+     guideDefinitions.forEach(guide => {
+         const label = document.createElement('label');
+         label.className = 'guide-item';
+         label.innerHTML = `
+            <input type="checkbox" value="${guide.id}" class="guide-checkbox" ${guide.default ? 'checked' : ''}>
+            <span>${guide.name}</span>
+         `;
+         guideContainer.appendChild(label);
+         label.querySelector('input').addEventListener('change', drawGuidelines);
+     });
+  }
+
+  let isDrawing = false;
+  let isAnimating = false;
+  let lastX = 0, lastY = 0;
+  let centerX, centerY;
+  let safeRadius;
+  let currentTool = 'pen';
+  let drawingHistory = [];
+  const MAX_HISTORY = 30;
+  const INTERNAL_SIZE = 2048;
+
+  // キャンバスの内部解像度を固定し、高画質を維持する
+  canvas.width = INTERNAL_SIZE;
+  canvas.height = INTERNAL_SIZE;
+  gCanvas.width = INTERNAL_SIZE;
+  gCanvas.height = INTERNAL_SIZE;
+
+  centerX = INTERNAL_SIZE / 2;
+  centerY = INTERNAL_SIZE / 2;
+  safeRadius = (INTERNAL_SIZE / 2) * 0.92;
+
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+
+  // --- パーティクルアニメーション ---
+  let particles = [];
+  let particleAnimationId;
+  let scatterStartTime = 0; // 呼吸サイクルの開始時刻
+
+  function initParticles(mode) {
+    const container = pCanvas.parentElement;
+    pCanvas.width = container.clientWidth;
+    pCanvas.height = container.clientHeight;
+    particles = [];
+
+     if (mode === 'scatter') {
+         // 描画された曼荼羅のピクセルデータを取得し、星屑（パーティクル）に変換
+         const rect = canvas.getBoundingClientRect();
+         const pRect = pCanvas.getBoundingClientRect();
+         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+
+         // パフォーマンスを考慮して取得間隔を調整（スマホは粗め、PCは細かめ）
+         const step = window.innerWidth < 768 ? 14 : 10;
+
+         const scaleX = rect.width / canvas.width;
+         const scaleY = rect.height / canvas.height;
+         // パーティクルキャンバス内の相対座標に変換
+         const offsetX = rect.left - pRect.left;
+         const offsetY = rect.top - pRect.top;
+
+         for (let y = 0; y < canvas.height; y += step) {
+            for (let x = 0; x < canvas.width; x += step) {
+               const i = (y * canvas.width + x) * 4;
+               const a = imageData[i + 3];
+               if (a > 30) { // 不透明なピクセルを抽出
+                   const homeX = offsetX + x * scaleX;
+                   const homeY = offsetY + y * scaleY;
+                   particles.push({
+                      // 現在位置（描画用）
+                      x: homeX,
+                      y: homeY,
+                      // ホーム位置（元の曼荼羅の形）— ここに必ず戻ってくる
+                      homeX: homeX,
+                      homeY: homeY,
+                      color: `rgba(${imageData[i]}, ${imageData[i+1]}, ${imageData[i+2]}, ${a / 255})`,
+                      size: Math.random() * 2 + 1,
+                      // 各パーティクルの個性（位相・揺らぎの強さ）
+                      phase: Math.random() * Math.PI * 2,
+                      floatRange: 30 + Math.random() * 60,    // ふわふわ漂う範囲（px）
+                      floatSpeed: 0.0008 + Math.random() * 0.0006, // 揺らぎのゆっくりさ
+                      // 浮上の方向にちょっとした個性をつける
+                      driftAngle: Math.random() * Math.PI * 2
+                   });
+               }
             }
+         }
+         // 呼吸サイクルの開始時刻を記録
+         scatterStartTime = performance.now();
+
+    } else {
+       // 背景用パーティクル
+       for(let i = 0; i < 150; i++) {
+          particles.push({
+              x: Math.random() * pCanvas.width,
+              y: Math.random() * pCanvas.height,
+              size: Math.random() * 2 + 0.5,
+              speedX: (Math.random() - 0.5) * 0.8,
+              speedY: (Math.random() - 0.5) * 0.8,
+              baseAlpha: Math.random() * 0.5 + 0.2
+          });
+       }
+    }
+}
+
+function animateParticles() {
+  if (!isAnimating) return;
+
+    const mode = animMode.value;
+
+    // 全モード共通でクリアに描画（残像なし）
+    pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+
+    const cx = pCanvas.width / 2;
+    const cy = pCanvas.height / 2;
+
+    // scatter モード用：呼吸サイクルの進行度を算出
+    let dispersion = 0;
+    if (mode === 'scatter') {
+        // 1サイクル = 12秒（ゆっくりと）
+        const CYCLE_DURATION = 12000;
+        const elapsed = (performance.now() - scatterStartTime) % CYCLE_DURATION;
+        const t = elapsed / CYCLE_DURATION; // 0〜1 の進行度
+
+        // フェーズ別の「ホーム位置からの距離係数」を算出
+        // 0 = ホーム位置にぴったり / 1 = 最大に拡散
+        if (t < 0.3) {
+            // 散開フェーズ（0〜30%）: easeOutCubicでふわっと浮上
+            const localT = t / 0.3;
+            dispersion = 1 - Math.pow(1 - localT, 3);
+        } else if (t < 0.7) {
+            // 遊泳フェーズ（30〜70%）: 拡散しきった状態で踊る
+            dispersion = 1;
+        } else {
+            // 回帰フェーズ（70〜100%）: easeInOutCubicで元の形に戻る
+            const localT = (t - 0.7) / 0.3;
+            dispersion = 1 - (localT < 0.5
+                ? 4 * localT * localT * localT
+                : 1 - Math.pow(-2 * localT + 2, 3) / 2);
         }
-        throw new Error('Maximum retries exceeded');
     }
 
-    const canvas = document.getElementById('mandalaCanvas');
-    const ctx = canvas.getContext('2d');
-    const gCanvas = document.getElementById('guideCanvas');
-    const gCtx = gCanvas.getContext('2d');
-    const canvasFrame = document.getElementById('canvasFrame');
-    const sidebar = document.getElementById('sidebar');
-    const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
+    particles.forEach(p => {
+       if (mode === 'scatter') {
+           // === 呼吸サイクル: 散開 → 遊泳 → 回帰 を繰り返す ===
 
-    const colorPicker = document.getElementById('colorPicker');
-    const colorHex = document.getElementById('colorHex');
-    const sizeSlider = document.getElementById('sizeSlider');
-    const sizeVal = document.getElementById('sizeVal');
-    const divSlider = document.getElementById('divSlider');
-    const divVal = document.getElementById('divVal');
-    
-    const toolPen = document.getElementById('toolPen');
-    const toolDot = document.getElementById('toolDot');
-    const toolEraser = document.getElementById('toolEraser');
-    const undoBtn = document.getElementById('undoBtn');
-    const symmetryToggle = document.getElementById('symmetryToggle');
-    const mirrorToggle = document.getElementById('mirrorToggle');
-    
-    const guideToggle = document.getElementById('guideToggle');
-    const guideContainer = document.getElementById('guideContainer');
-    const guideAlphaSlider = document.getElementById('guideAlphaSlider');
-    const guideAlphaVal = document.getElementById('guideAlphaVal');
-    
-    const clearBtn = document.getElementById('clearBtn');
-    const saveBtn = document.getElementById('saveBtn');
-    const inspirationBtn = document.getElementById('inspirationBtn');
-    const inspirationQuery = document.getElementById('inspirationQuery');
-    const analyzeBtn = document.getElementById('analyzeBtn');
-    const aiResponse = document.getElementById('aiResponse');
-    const aiText = document.getElementById('aiText');
-    const loadingOverlay = document.getElementById('loadingOverlay');
-    const saveModal = document.getElementById('saveModal');
-    const savePreview = document.getElementById('savePreview');
-    const downloadLink = document.getElementById('downloadLink');
-    const closeModal = document.getElementById('closeModal');
+           // 揺らぎ（踊るような動き）— 三角関数の重ね合わせで滑らかに
+           const time = performance.now() * p.floatSpeed;
+           const wobbleX = Math.cos(time + p.phase) * p.floatRange
+                         + Math.sin(time * 1.7 + p.phase * 1.3) * p.floatRange * 0.4;
+           const wobbleY = Math.sin(time + p.phase) * p.floatRange
+                         + Math.cos(time * 1.5 + p.phase * 1.1) * p.floatRange * 0.4;
 
-    const guideDefinitions = [
-        { id: 'horoscope', name: 'ホロスコープ (12分割)', default: true },
-        { id: 'fruit', name: 'フルーツ・オブ・ライフ', default: false },
-        { id: 'flower', name: 'フラワー・オブ・ライフ', default: false },
-        { id: 'seed', name: 'シード・オブ・ライフ', default: false },
-        { id: 'metatron', name: 'メタトロン・キューブ', default: false },
-        { id: 'merkaba', name: 'マカバ (Merkaba)', default: false },
-        { id: 'cube', name: '立方体 (Hexahedron)', default: false },
-        { id: 'treeOfLife', name: '生命の樹 (Sephirot)', default: false },
-        { id: 'unicursalHex', name: '一筆書き六芒星', default: false },
-        { id: 'vesica', name: 'ヴェシカ・パイシス', default: false },
-        { id: 'torus', name: 'チューブ・トーラス', default: false },
-        { id: 'octagram', name: 'オクタグラム (8芒星)', default: false },
-        { id: 'flower12', name: '12花弁の生命の紋章', default: false },
-        { id: 'shriyantra', name: 'シュリ・ヤントラ (簡易)', default: false },
-        { id: 'hexagram', name: '六芒星 (Hexagram)', default: false }
-    ];
+           // 浮上方向のドリフト（少しだけ上に向かう傾向）
+           const driftX = Math.cos(p.driftAngle) * 20 * dispersion;
+           const driftY = Math.sin(p.driftAngle) * 20 * dispersion - 15 * dispersion;
 
-    function initGuideList() {
-        guideContainer.innerHTML = '';
-        guideDefinitions.forEach(guide => {
-            const label = document.createElement('label');
-            label.className = 'guide-item';
-            label.innerHTML = `
-                <input type="checkbox" value="${guide.id}" class="guide-checkbox" ${guide.default ? 'checked' : ''}>
-                <span>${guide.name}</span>
-            `;
-            guideContainer.appendChild(label);
-            label.querySelector('input').addEventListener('change', drawGuidelines);
-        });
-    }
+           // 最終位置 = ホーム位置 + 揺らぎ × 拡散度
+           p.x = p.homeX + (wobbleX + driftX) * dispersion;
+           p.y = p.homeY + (wobbleY + driftY) * dispersion;
 
-    let isDrawing = false;
-    let lastX = 0, lastY = 0;
-    let centerX, centerY;
-    let safeRadius; 
-    let currentTool = 'pen'; 
-    let drawingHistory = [];
-    const MAX_HISTORY = 30;
+           // 拡散度に応じて少しだけ明度を変化させる（呼吸感）
+           pCtx.fillStyle = p.color;
+           pCtx.globalAlpha = 0.7 + 0.3 * (1 - Math.abs(dispersion - 0.5) * 2);
+           pCtx.fillRect(p.x, p.y, p.size, p.size);
+           pCtx.globalAlpha = 1.0;
+       }
+       else if (mode === 'warp') {
+          // ワープモード：放射状に飛ぶ
+          const dx = p.x - cx;
+          const dy = p.y - cy;
+          const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+          p.x += (dx / dist) * (dist * 0.02 + 1);
+          p.y += (dy / dist) * (dist * 0.02 + 1);
+          p.size += 0.02;
+
+          if (p.x < 0 || p.x > pCanvas.width || p.y < 0 || p.y > pCanvas.height) {
+              p.x = cx + (Math.random() - 0.5) * 100;
+              p.y = cy + (Math.random() - 0.5) * 100;
+              p.size = Math.random() * 1.5 + 0.5;
+          }
+          pCtx.beginPath();
+          pCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          pCtx.fillStyle = `rgba(150, 220, 255, ${p.baseAlpha})`;
+          pCtx.fill();
+       } else {
+          // 通常・万華鏡モード：ふわふわ漂う
+          p.x += p.speedX;
+          p.y += p.speedY;
+          if (p.x < 0) p.x = pCanvas.width;
+          if (p.x > pCanvas.width) p.x = 0;
+          if (p.y < 0) p.y = pCanvas.height;
+          if (p.y > pCanvas.height) p.y = 0;
+
+           pCtx.beginPath();
+           pCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+           pCtx.fillStyle = mode === 'kaleidoscope'
+             ? `hsla(${(p.x + p.y) % 360}, 80%, 70%, ${p.baseAlpha})`
+             : `rgba(150, 220, 255, ${p.baseAlpha})`;
+           pCtx.fill();
+       }
+    });
+
+    particleAnimationId = requestAnimationFrame(animateParticles);
+}
 
     function resizeCanvas() {
-        const container = canvas.parentElement.parentElement;
-        const availableW = container.clientWidth;
-        const availableH = container.clientHeight;
-        const size = Math.min(availableW, availableH) * 0.95;
-        
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = canvas.width;
-        tempCanvas.height = canvas.height;
-        if (canvas.width > 0) tempCanvas.getContext('2d').drawImage(canvas, 0, 0);
+      const container = canvasFrame.parentElement;
+      const availableW = container.clientWidth;
+      const availableH = container.clientHeight;
+      const size = Math.min(availableW, availableH) * 0.95;
 
-        canvasFrame.style.width = size + 'px';
-        canvasFrame.style.height = size + 'px';
-        canvas.width = size;
-        canvas.height = size;
-        gCanvas.width = size;
-        gCanvas.height = size;
-        
-        centerX = canvas.width / 2;
-        centerY = canvas.height / 2;
-        safeRadius = (size / 2) * 0.92; 
-        
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
-        
-        if (tempCanvas.width > 0) {
-            ctx.drawImage(tempCanvas, (canvas.width - tempCanvas.width)/2, (canvas.height - tempCanvas.height)/2);
+      // CSSでの表示サイズのみを変更し、内部のピクセルは再配置しない（画質劣化を防ぐ）
+      canvasFrame.style.width = size + 'px';
+      canvasFrame.style.height = size + 'px';
+
+      // パーティクルキャンバスのリサイズ
+      if (pCanvas) {
+          pCanvas.width = availableW;
+          pCanvas.height = availableH;
+          if (isAnimating) initParticles(animMode.value);
+      }
+}
+
+// パレット開閉トグル
+toggleSidebarBtn.onclick = () => {
+   const isOpening = sidebar.classList.contains('sidebar-collapsed');
+   sidebar.classList.toggle('sidebar-collapsed');
+   toggleSidebarBtn.textContent = isOpening ? '⚡' : '☰';
+
+     // アニメーションに合わせてリサイズを実行
+     let start = null;
+     const animateResize = (timestamp) => {
+        if (!start) start = timestamp;
+        resizeCanvas();
+        if (timestamp - start < 500) {
+            requestAnimationFrame(animateResize);
         }
-        drawGuidelines();
+     };
+     requestAnimationFrame(animateResize);
+};
+
+function saveHistory() {
+  drawingHistory.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+  if (drawingHistory.length > MAX_HISTORY) drawingHistory.shift();
+}
+
+function undo() {
+  if (drawingHistory.length > 0) {
+      const lastState = drawingHistory.pop();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.putImageData(lastState, 0, 0);
+  }
+}
+
+const drawPatterns = {
+  horoscope: () => {
+    gCtx.setLineDash([5, 5]);
+    for (let i = 1; i <= 6; i++) {
+        gCtx.beginPath(); gCtx.arc(centerX, centerY, (safeRadius / 6) * i, 0, Math.PI * 2);
+        gCtx.stroke();
     }
-
-    // パレット開閉トグル
-    toggleSidebarBtn.onclick = () => {
-        const isOpening = sidebar.classList.contains('sidebar-collapsed');
-        sidebar.classList.toggle('sidebar-collapsed');
-        toggleSidebarBtn.textContent = isOpening ? '⚡' : '☰';
-        
-        // アニメーションに合わせてリサイズを実行
-        let start = null;
-        const animateResize = (timestamp) => {
-            if (!start) start = timestamp;
-            resizeCanvas();
-            if (timestamp - start < 500) {
-                requestAnimationFrame(animateResize);
-            }
-        };
-        requestAnimationFrame(animateResize);
-    };
-
-    function saveHistory() {
-        drawingHistory.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
-        if (drawingHistory.length > MAX_HISTORY) drawingHistory.shift();
+    gCtx.setLineDash([]);
+    for (let i = 0; i < 12; i++) {
+        const a = (i * 2 * Math.PI) / 12;
+        gCtx.beginPath(); gCtx.moveTo(centerX, centerY);
+        gCtx.lineTo(centerX + Math.cos(a) * safeRadius, centerY + Math.sin(a) * safeRadius);
+        gCtx.stroke();
     }
-
-    function undo() {
-        if (drawingHistory.length > 0) {
-            const lastState = drawingHistory.pop();
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.putImageData(lastState, 0, 0);
-        }
-    }
-
-    const drawPatterns = {
-        horoscope: () => {
-            gCtx.setLineDash([5, 5]);
-            for (let i = 1; i <= 6; i++) {
-                gCtx.beginPath(); gCtx.arc(centerX, centerY, (safeRadius / 6) * i, 0, Math.PI * 2); gCtx.stroke();
-            }
-            gCtx.setLineDash([]);
-            for (let i = 0; i < 12; i++) {
-                const a = (i * 2 * Math.PI) / 12;
-                gCtx.beginPath(); gCtx.moveTo(centerX, centerY);
-                gCtx.lineTo(centerX + Math.cos(a) * safeRadius, centerY + Math.sin(a) * safeRadius);
-                gCtx.stroke();
-            }
-        },
-        fruit: () => {
-            const unitR = safeRadius / 5;
-            const centers = [{x: 0, y: 0}];
-            for (let i = 0; i < 6; i++) {
-                const a = (i * Math.PI) / 3;
-                centers.push({x: Math.cos(a) * unitR * 2, y: Math.sin(a) * unitR * 2});
-                centers.push({x: Math.cos(a) * unitR * 4, y: Math.sin(a) * unitR * 4});
-            }
-            centers.forEach(p => {
-                gCtx.beginPath(); gCtx.arc(centerX + p.x, centerY + p.y, unitR, 0, Math.PI * 2); gCtx.stroke();
-            });
-        },
-        flower: () => {
-            const unitR = safeRadius / 4;
-            const drawC = (x, y) => { gCtx.beginPath(); gCtx.arc(x, y, unitR, 0, Math.PI * 2); gCtx.stroke(); };
-            drawC(centerX, centerY);
-            for (let l = 1; l <= 3; l++) {
-                for (let i = 0; i < 6; i++) {
-                    const a = (i * Math.PI) / 3;
-                    const sx = centerX + Math.cos(a) * unitR * l;
-                    const sy = centerY + Math.sin(a) * unitR * l;
-                    drawC(sx, sy);
-                    if (l > 1) {
-                        const na = ((i + 1) * Math.PI) / 3;
-                        for (let s = 1; s < l; s++) {
-                            drawC(sx + (centerX + Math.cos(na) * unitR * l - sx) * (s / l), sy + (centerY + Math.sin(na) * unitR * l - sy) * (s / l));
-                        }
-                    }
+  },
+  fruit: () => {
+     const unitR = safeRadius / 5;
+     const centers = [{x: 0, y: 0}];
+     for (let i = 0; i < 6; i++) {
+         const a = (i * Math.PI) / 3;
+         centers.push({x: Math.cos(a) * unitR * 2, y: Math.sin(a) * unitR * 2});
+         centers.push({x: Math.cos(a) * unitR * 4, y: Math.sin(a) * unitR * 4});
+     }
+     centers.forEach(p => {
+         gCtx.beginPath(); gCtx.arc(centerX + p.x, centerY + p.y, unitR, 0, Math.PI * 2);
+         gCtx.stroke();
+     });
+  },
+  flower: () => {
+     const unitR = safeRadius / 4;
+     const drawC = (x, y) => { gCtx.beginPath(); gCtx.arc(x, y, unitR, 0, Math.PI * 2); gCtx.stroke(); };
+     drawC(centerX, centerY);
+     for (let l = 1; l <= 3; l++) {
+         for (let i = 0; i < 6; i++) {
+            const a = (i * Math.PI) / 3;
+            const sx = centerX + Math.cos(a) * unitR * l;
+            const sy = centerY + Math.sin(a) * unitR * l;
+            drawC(sx, sy);
+            if (l > 1) {
+                const na = ((i + 1) * Math.PI) / 3;
+                for (let s = 1; s < l; s++) {
+                   drawC(sx + (centerX + Math.cos(na) * unitR * l - sx) * (s / l), sy + (centerY + Math.sin(na) * unitR * l - sy) * (s / l));
                 }
             }
-        },
-        seed: () => {
-            const unitR = safeRadius / 2.2;
-            const drawC = (x, y) => { gCtx.beginPath(); gCtx.arc(x, y, unitR, 0, Math.PI * 2); gCtx.stroke(); };
-            drawC(centerX, centerY);
-            for (let i = 0; i < 6; i++) {
-                const a = (i * Math.PI) / 3;
-                drawC(centerX + Math.cos(a) * unitR, centerY + Math.sin(a) * unitR);
-            }
-        },
-        metatron: () => {
-            const unitR = safeRadius / 5;
-            const centers = [{x: centerX, y: centerY}];
-            const drawC = (x, y) => { gCtx.beginPath(); gCtx.arc(x, y, unitR, 0, Math.PI * 2); gCtx.stroke(); };
-            drawC(centerX, centerY);
-            for (let i = 0; i < 6; i++) {
-                const a = (i * Math.PI) / 3;
-                const c1 = {x: centerX + Math.cos(a) * unitR * 2, y: centerY + Math.sin(a) * unitR * 2};
-                const c2 = {x: centerX + Math.cos(a) * unitR * 4, y: centerY + Math.sin(a) * unitR * 4};
-                centers.push(c1); centers.push(c2);
-                drawC(c1.x, c1.y); drawC(c2.x, c2.y);
-            }
-            gCtx.lineWidth = 0.5;
-            for(let i=0; i<centers.length; i++) {
-                for(let j=i+1; j<centers.length; j++) {
-                    gCtx.beginPath(); gCtx.moveTo(centers[i].x, centers[i].y);
-                    gCtx.lineTo(centers[j].x, centers[j].y); gCtx.stroke();
-                }
-            }
-        },
-        merkaba: () => {
-            const r = safeRadius;
-            const tri = (rot) => {
-                gCtx.beginPath();
-                for(let i=0; i<3; i++){
-                    const a = (i * 2 * Math.PI / 3) + rot;
-                    const px = centerX + Math.cos(a) * r;
-                    const py = centerY + Math.sin(a) * r;
-                    if(i===0) gCtx.moveTo(px, py); else gCtx.lineTo(px, py);
-                }
-                gCtx.closePath(); gCtx.stroke();
-            };
-            tri(-Math.PI/2); tri(Math.PI/2);
-            for(let i=0; i<3; i++) {
-                const a1 = (i * 2 * Math.PI / 3) - Math.PI/2;
-                const a2 = (i * 2 * Math.PI / 3) + Math.PI/2;
-                gCtx.beginPath();
-                gCtx.moveTo(centerX + Math.cos(a1) * r, centerY + Math.sin(a1) * r);
-                gCtx.lineTo(centerX + Math.cos(a2) * (r*0.5), centerY + Math.sin(a2) * (r*0.5));
-                gCtx.stroke();
-            }
-        },
-        cube: () => {
-            const r = safeRadius;
-            const pts = [];
-            for(let i=0; i<6; i++) {
-                const a = (i * Math.PI / 3);
-                pts.push({x: centerX + Math.cos(a) * r, y: centerY + Math.sin(a) * r});
-            }
-            gCtx.beginPath(); gCtx.moveTo(pts[0].x, pts[0].y);
-            pts.forEach(p => gCtx.lineTo(p.x, p.y)); gCtx.closePath(); gCtx.stroke();
-            for(let i=0; i<6; i+=2) {
-                gCtx.beginPath(); gCtx.moveTo(centerX, centerY);
-                gCtx.lineTo(pts[i].x, pts[i].y); gCtx.stroke();
-            }
-        },
-        treeOfLife: () => {
-            const unit = safeRadius / 3.5;
-            const nodes = [
-                {x: 0, y: -3}, {x: -1, y: -2}, {x: 1, y: -2},
-                {x: -1, y: 0}, {x: 1, y: 0}, {x: 0, y: -1},
-                {x: 0, y: 1}, {x: -1, y: 2}, {x: 1, y: 2}, {x: 0, y: 3}
-            ].map(p => ({x: centerX + p.x * unit, y: centerY + p.y * unit}));
-            const connections = [[0,1],[0,2],[1,2],[1,3],[2,4],[3,4],[3,5],[4,5],[1,5],[2,5],[5,6],[3,6],[4,6],[3,7],[4,8],[7,8],[7,6],[8,6],[6,9],[7,9],[8,9]];
-            connections.forEach(([i,j]) => {
-                gCtx.beginPath(); gCtx.moveTo(nodes[i].x, nodes[i].y);
-                gCtx.lineTo(nodes[j].x, nodes[j].y); gCtx.stroke();
-            });
-            nodes.forEach(n => {
-                gCtx.beginPath(); gCtx.arc(n.x, n.y, unit/3, 0, Math.PI*2); gCtx.stroke();
-            });
-        },
-        unicursalHex: () => {
-            const r = safeRadius;
-            const pts = [];
-            for(let i=0; i<6; i++){
-                const a = (i * Math.PI / 3) - Math.PI/2;
-                const dist = (i % 2 === 0) ? r : r * 0.4;
-                pts.push({x: centerX + Math.cos(a) * dist, y: centerY + Math.sin(a) * dist});
-            }
-            gCtx.beginPath(); gCtx.moveTo(pts[0].x, pts[0].y);
-            const order = [0, 3, 4, 1, 2, 5];
-            order.forEach(idx => gCtx.lineTo(pts[idx].x, pts[idx].y));
-            gCtx.closePath(); gCtx.stroke();
-        },
-        vesica: () => {
-            const r = safeRadius / 1.5;
-            const drawC = (x, y) => { gCtx.beginPath(); gCtx.arc(x, y, r, 0, Math.PI * 2); gCtx.stroke(); };
-            drawC(centerX - r/2, centerY); drawC(centerX + r/2, centerY);
-        },
-        torus: () => {
-            const count = 36;
-            const ringR = safeRadius * 0.5;
-            for(let i=0; i<count; i++) {
-                const a = (i * Math.PI * 2) / count;
-                gCtx.beginPath();
-                gCtx.arc(centerX + Math.cos(a) * ringR, centerY + Math.sin(a) * ringR, ringR, 0, Math.PI * 2);
-                gCtx.stroke();
-            }
-        },
-        octagram: () => {
-            const drawSquare = (rot) => {
-                gCtx.beginPath();
-                for(let i=0; i<4; i++){
-                    const a = (i * Math.PI / 2) + rot;
-                    const px = centerX + Math.cos(a) * safeRadius;
-                    const py = centerY + Math.sin(a) * safeRadius;
-                    if(i===0) gCtx.moveTo(px, py); else gCtx.lineTo(px, py);
-                }
-                gCtx.closePath(); gCtx.stroke();
-            };
-            drawSquare(0); drawSquare(Math.PI/4);
-            gCtx.beginPath(); gCtx.arc(centerX, centerY, safeRadius, 0, Math.PI*2); gCtx.stroke();
-        },
-        flower12: () => {
-            const unitR = safeRadius / 2.5;
-            for(let i=0; i<12; i++){
-                const a = (i * Math.PI * 2) / 12;
-                gCtx.beginPath(); 
-                gCtx.arc(centerX + Math.cos(a) * unitR, centerY + Math.sin(a) * unitR, unitR, 0, Math.PI * 2); 
-                gCtx.stroke();
-            }
-        },
-        shriyantra: () => {
-            const sizes = [1, 0.8, 0.6, 0.4];
-            sizes.forEach((s, idx) => {
-                const r = safeRadius * s;
-                const rot = (idx % 2 === 0) ? -Math.PI/2 : Math.PI/2;
-                gCtx.beginPath();
-                for(let i=0; i<3; i++){
-                    const a = (i * 2 * Math.PI / 3) + rot;
-                    const px = centerX + Math.cos(a) * r;
-                    const py = centerY + Math.sin(a) * r;
-                    if(i===0) gCtx.moveTo(px, py); else gCtx.lineTo(px, py);
-                }
-                gCtx.closePath(); gCtx.stroke();
-            });
-            gCtx.beginPath(); gCtx.arc(centerX, centerY, safeRadius, 0, Math.PI*2); gCtx.stroke();
-        },
-        hexagram: () => {
-            const tri = (rot) => {
-                gCtx.beginPath();
-                for (let i = 0; i < 3; i++) {
-                    const a = (i * 2 * Math.PI) / 3 + rot;
-                    const px = centerX + Math.cos(a) * safeRadius;
-                    const py = centerY + Math.sin(a) * safeRadius;
-                    if (i === 0) gCtx.moveTo(px, py); else gCtx.lineTo(px, py);
-                }
-                gCtx.closePath(); gCtx.stroke();
-            };
-            tri(-Math.PI / 2); tri(Math.PI / 2);
-            gCtx.beginPath(); gCtx.arc(centerX, centerY, safeRadius, 0, Math.PI*2); gCtx.stroke();
+         }
+     }
+  },
+  seed: () => {
+     const unitR = safeRadius / 2.2;
+     const drawC = (x, y) => { gCtx.beginPath(); gCtx.arc(x, y, unitR, 0, Math.PI * 2); gCtx.stroke(); };
+     drawC(centerX, centerY);
+     for (let i = 0; i < 6; i++) {
+         const a = (i * Math.PI) / 3;
+         drawC(centerX + Math.cos(a) * unitR, centerY + Math.sin(a) * unitR);
+     }
+  },
+  metatron: () => {
+     const unitR = safeRadius / 5;
+     const centers = [{x: centerX, y: centerY}];
+     const drawC = (x, y) => { gCtx.beginPath(); gCtx.arc(x, y, unitR, 0, Math.PI * 2); gCtx.stroke(); };
+     drawC(centerX, centerY);
+     for (let i = 0; i < 6; i++) {
+         const a = (i * Math.PI) / 3;
+         const c1 = {x: centerX + Math.cos(a) * unitR * 2, y: centerY + Math.sin(a) * unitR * 2};
+         const c2 = {x: centerX + Math.cos(a) * unitR * 4, y: centerY + Math.sin(a) * unitR * 4};
+         centers.push(c1); centers.push(c2);
+         drawC(c1.x, c1.y); drawC(c2.x, c2.y);
+     }
+     gCtx.lineWidth = 0.5;
+     for(let i=0; i<centers.length; i++) {
+         for(let j=i+1; j<centers.length; j++) {
+            gCtx.beginPath(); gCtx.moveTo(centers[i].x, centers[i].y);
+            gCtx.lineTo(centers[j].x, centers[j].y); gCtx.stroke();
+         }
+     }
+  },
+  merkaba: () => {
+     const r = safeRadius;
+     const tri = (rot) => {
+         gCtx.beginPath();
+         for(let i=0; i<3; i++){
+            const a = (i * 2 * Math.PI / 3) + rot;
+            const px = centerX + Math.cos(a) * r;
+            const py = centerY + Math.sin(a) * r;
+            if(i===0) gCtx.moveTo(px, py); else gCtx.lineTo(px, py);
+         }
+         gCtx.closePath(); gCtx.stroke();
+     };
+     tri(-Math.PI/2); tri(Math.PI/2);
+     for(let i=0; i<3; i++) {
+         const a1 = (i * 2 * Math.PI / 3) - Math.PI/2;
+         const a2 = (i * 2 * Math.PI / 3) + Math.PI/2;
+         gCtx.beginPath();
+         gCtx.moveTo(centerX + Math.cos(a1) * r, centerY + Math.sin(a1) * r);
+         gCtx.lineTo(centerX + Math.cos(a2) * (r*0.5), centerY + Math.sin(a2) * (r*0.5));
+         gCtx.stroke();
+     }
+  },
+  cube: () => {
+     const r = safeRadius;
+     const pts = [];
+     for(let i=0; i<6; i++) {
+         const a = (i * Math.PI / 3);
+         pts.push({x: centerX + Math.cos(a) * r, y: centerY + Math.sin(a) * r});
+     }
+     gCtx.beginPath(); gCtx.moveTo(pts[0].x, pts[0].y);
+     pts.forEach(p => gCtx.lineTo(p.x, p.y)); gCtx.closePath(); gCtx.stroke();
+     for(let i=0; i<6; i+=2) {
+         gCtx.beginPath(); gCtx.moveTo(centerX, centerY);
+         gCtx.lineTo(pts[i].x, pts[i].y); gCtx.stroke();
+     }
+  },
+  treeOfLife: () => {
+     const unit = safeRadius / 3.5;
+     const nodes = [
+         {x: 0, y: -3}, {x: -1, y: -2}, {x: 1, y: -2},
+         {x: -1, y: 0}, {x: 1, y: 0}, {x: 0, y: -1},
+         {x: 0, y: 1}, {x: -1, y: 2}, {x: 1, y: 2}, {x: 0, y: 3}
+     ].map(p => ({x: centerX + p.x * unit, y: centerY + p.y * unit}));
+     const connections = [[0,1],[0,2],[1,2],[1,3],[2,4],[3,4],[3,5],[4,5],[1,5],[2,5],[5,6],[3,6],[4,6],[3,7],[4,8],[7,8],[7,6],[8,6],[6,9],[7,9],[8,9]];
+     connections.forEach(([i,j]) => {
+         gCtx.beginPath(); gCtx.moveTo(nodes[i].x, nodes[i].y);
+         gCtx.lineTo(nodes[j].x, nodes[j].y); gCtx.stroke();
+     });
+     nodes.forEach(n => {
+         gCtx.beginPath(); gCtx.arc(n.x, n.y, unit/3, 0, Math.PI*2); gCtx.stroke();
+     });
+  },
+  unicursalHex: () => {
+     const r = safeRadius;
+     const pts = [];
+     for(let i=0; i<6; i++){
+         const a = (i * Math.PI / 3) - Math.PI/2;
+         const dist = (i % 2 === 0) ? r : r * 0.4;
+         pts.push({x: centerX + Math.cos(a) * dist, y: centerY + Math.sin(a) * dist});
+     }
+     gCtx.beginPath(); gCtx.moveTo(pts[0].x, pts[0].y);
+     const order = [0, 3, 4, 1, 2, 5];
+     order.forEach(idx => gCtx.lineTo(pts[idx].x, pts[idx].y));
+     gCtx.closePath(); gCtx.stroke();
+  },
+  vesica: () => {
+     const r = safeRadius / 1.5;
+     const drawC = (x, y) => { gCtx.beginPath(); gCtx.arc(x, y, r, 0, Math.PI * 2); gCtx.stroke(); };
+     drawC(centerX - r/2, centerY); drawC(centerX + r/2, centerY);
+  },
+  torus: () => {
+     const count = 36;
+     const ringR = safeRadius * 0.5;
+     for(let i=0; i<count; i++) {
+        const a = (i * Math.PI * 2) / count;
+        gCtx.beginPath();
+        gCtx.arc(centerX + Math.cos(a) * ringR, centerY + Math.sin(a) * ringR, ringR, 0, Math.PI * 2);
+        gCtx.stroke();
+     }
+  },
+  octagram: () => {
+     const drawSquare = (rot) => {
+        gCtx.beginPath();
+        for(let i=0; i<4; i++){
+           const a = (i * Math.PI / 2) + rot;
+           const px = centerX + Math.cos(a) * safeRadius;
+           const py = centerY + Math.sin(a) * safeRadius;
+           if(i===0) gCtx.moveTo(px, py); else gCtx.lineTo(px, py);
         }
-    };
-
-    function drawGuidelines() {
-        gCtx.clearRect(0, 0, gCanvas.width, gCanvas.height);
-        gCanvas.style.opacity = guideToggle.checked ? "1" : "0";
-        if (!guideToggle.checked) return;
-
-        const alpha = parseFloat(guideAlphaSlider.value);
-        gCtx.strokeStyle = `rgba(56, 189, 248, ${alpha})`;
-        gCtx.lineWidth = 1;
-
-        const activeGuides = Array.from(document.querySelectorAll('.guide-checkbox:checked')).map(cb => cb.value);
-        activeGuides.forEach(id => {
-            if (drawPatterns[id]) drawPatterns[id]();
-        });
-    }
-
-    function handleStart(e) {
-        saveHistory();
-        isDrawing = true;
-        const pos = getPos(e);
-        lastX = pos.x; lastY = pos.y;
-        drawPoints(pos.x, pos.y, pos.x, pos.y);
-    }
-
-    function handleMove(e) {
-        if (!isDrawing) return;
-        e.preventDefault();
-        const pos = getPos(e);
-        drawPoints(lastX, lastY, pos.x, pos.y);
-        lastX = pos.x; lastY = pos.y;
-    }
-
-    function drawPoints(x1, y1, x2, y2) {
-        const color = colorPicker.value;
-        const size = parseInt(sizeSlider.value);
-        const isSym = symmetryToggle.checked;
-        const divisions = isSym ? parseInt(divSlider.value) : 1;
-        const useMirror = mirrorToggle.checked;
-
-        ctx.save();
-        if (currentTool === 'eraser') {
-            ctx.globalCompositeOperation = 'destination-out';
-        } else {
-            ctx.globalCompositeOperation = 'source-over';
-            ctx.shadowBlur = size * 0.7;
-            ctx.shadowColor = color;
-            ctx.strokeStyle = color;
-            ctx.fillStyle = color;
+        gCtx.closePath(); gCtx.stroke();
+     };
+     drawSquare(0); drawSquare(Math.PI/4);
+     gCtx.beginPath(); gCtx.arc(centerX, centerY, safeRadius, 0, Math.PI*2); gCtx.stroke();
+  },
+  flower12: () => {
+     const unitR = safeRadius / 2.5;
+     for(let i=0; i<12; i++){
+        const a = (i * Math.PI * 2) / 12;
+        gCtx.beginPath();
+        gCtx.arc(centerX + Math.cos(a) * unitR, centerY + Math.sin(a) * unitR, unitR, 0, Math.PI * 2);
+        gCtx.stroke();
+     }
+  },
+  shriyantra: () => {
+     const sizes = [1, 0.8, 0.6, 0.4];
+     sizes.forEach((s, idx) => {
+        const r = safeRadius * s;
+        const rot = (idx % 2 === 0) ? -Math.PI/2 : Math.PI/2;
+        gCtx.beginPath();
+        for(let i=0; i<3; i++){
+           const a = (i * 2 * Math.PI / 3) + rot;
+           const px = centerX + Math.cos(a) * r;
+           const py = centerY + Math.sin(a) * r;
+           if(i===0) gCtx.moveTo(px, py); else gCtx.lineTo(px, py);
         }
-        ctx.lineWidth = size;
+        gCtx.closePath(); gCtx.stroke();
+     });
+     gCtx.beginPath(); gCtx.arc(centerX, centerY, safeRadius, 0, Math.PI*2); gCtx.stroke();
+  },
+  hexagram: () => {
+     const tri = (rot) => {
+         gCtx.beginPath();
+         for (let i = 0; i < 3; i++) {
+            const a = (i * 2 * Math.PI) / 3 + rot;
+            const px = centerX + Math.cos(a) * safeRadius;
+            const py = centerY + Math.sin(a) * safeRadius;
+            if (i === 0) gCtx.moveTo(px, py); else gCtx.lineTo(px, py);
+         }
+         gCtx.closePath(); gCtx.stroke();
+     };
+     tri(-Math.PI / 2); tri(Math.PI / 2);
+     gCtx.beginPath(); gCtx.arc(centerX, centerY, safeRadius, 0, Math.PI*2); gCtx.stroke();
+  }
+};
 
-        const rx1 = x1 - centerX, ry1 = y1 - centerY;
-        const rx2 = x2 - centerX, ry2 = y2 - centerY;
+  function drawGuidelines() {
+    gCtx.clearRect(0, 0, gCanvas.width, gCanvas.height);
+    gCanvas.style.opacity = guideToggle.checked ? "1" : "0";
+    if (!guideToggle.checked) return;
 
-        for (let i = 0; i < divisions; i++) {
-            const angle = (i * 2 * Math.PI) / divisions;
-            ctx.save();
-            ctx.translate(centerX, centerY);
-            ctx.rotate(angle);
-            
-            drawSegment(rx1, ry1, rx2, ry2);
-            if (useMirror && isSym) {
-                ctx.scale(1, -1);
-                drawSegment(rx1, ry1, rx2, ry2);
-            }
-            ctx.restore();
-        }
-        ctx.restore();
+     const alpha = parseFloat(guideAlphaSlider.value);
+     gCtx.strokeStyle = `rgba(56, 189, 248, ${alpha})`;
+     gCtx.lineWidth = 2; // 高解像度に合わせて少し太くする
+
+     const activeGuides = Array.from(document.querySelectorAll('.guide-checkbox:checked')).map(cb => cb.value);
+     activeGuides.forEach(id => {
+         if (drawPatterns[id]) drawPatterns[id]();
+     });
+  }
+
+  function handleStart(e) {
+    if (isAnimating) return; // アニメーション中は描画ロック
+    saveHistory();
+    isDrawing = true;
+    const pos = getPos(e);
+    lastX = pos.x; lastY = pos.y;
+    drawPoints(pos.x, pos.y, pos.x, pos.y);
+}
+
+function handleMove(e) {
+  if (!isDrawing || isAnimating) return;
+  e.preventDefault();
+  const pos = getPos(e);
+  drawPoints(lastX, lastY, pos.x, pos.y);
+  lastX = pos.x; lastY = pos.y;
+}
+
+function drawPoints(x1, y1, x2, y2) {
+  const color = colorPicker.value;
+  const size = parseInt(sizeSlider.value);
+  const isSym = symmetryToggle.checked;
+  const divisions = isSym ? parseInt(divSlider.value) : 1;
+  const useMirror = mirrorToggle.checked;
+
+    ctx.save();
+    if (currentTool === 'eraser') {
+        ctx.globalCompositeOperation = 'destination-out';
+    } else {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.shadowBlur = size * 0.7;
+        ctx.shadowColor = color;
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
     }
+    ctx.lineWidth = size;
 
-    function drawSegment(x1, y1, x2, y2) {
-        ctx.beginPath();
-        if (currentTool === 'dot') {
-            ctx.arc(x2, y2, ctx.lineWidth/2, 0, Math.PI*2);
-            ctx.fill();
-        } else {
-            ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-        }
+    const rx1 = x1 - centerX, ry1 = y1 - centerY;
+    const rx2 = x2 - centerX, ry2 = y2 - centerY;
+
+    for (let i = 0; i < divisions; i++) {
+       const angle = (i * 2 * Math.PI) / divisions;
+       ctx.save();
+       ctx.translate(centerX, centerY);
+       ctx.rotate(angle);
+
+      drawSegment(rx1, ry1, rx2, ry2);
+      if (useMirror && isSym) {
+          ctx.scale(1, -1);
+          drawSegment(rx1, ry1, rx2, ry2);
+      }
+      ctx.restore();
     }
+    ctx.restore();
+  }
 
-    function getPos(e) {
-        const rect = canvas.getBoundingClientRect();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        return { x: clientX - rect.left, y: clientY - rect.top };
+  function drawSegment(x1, y1, x2, y2) {
+    ctx.beginPath();
+    if (currentTool === 'dot') {
+        ctx.arc(x2, y2, ctx.lineWidth/2, 0, Math.PI*2);
+        ctx.fill();
+    } else {
+        ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
     }
+  }
 
-    function setActiveTool(tool, btn) {
-        currentTool = tool;
-        [toolPen, toolDot, toolEraser].forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-    }
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
 
-    toolPen.onclick = () => setActiveTool('pen', toolPen);
-    toolDot.onclick = () => setActiveTool('dot', toolDot);
-    toolEraser.onclick = () => setActiveTool('eraser', toolEraser);
-    undoBtn.onclick = undo;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-    colorPicker.oninput = (e) => colorHex.textContent = e.target.value.toUpperCase();
-    sizeSlider.oninput = (e) => { sizeVal.textContent = e.target.value; };
-    divSlider.oninput = (e) => { divVal.textContent = e.target.value; };
-    guideToggle.onchange = drawGuidelines;
-    guideAlphaSlider.oninput = (e) => { guideAlphaVal.textContent = e.target.value; drawGuidelines(); };
+      return {
+         x: (clientX - rect.left) * scaleX,
+         y: (clientY - rect.top) * scaleY
+      };
+  }
 
-    inspirationBtn.onclick = async () => {
-        const query = inspirationQuery.value.trim();
-        if (!query) return;
-        loadingOverlay.classList.remove('hidden');
-        try {
-            const systemPrompt = "You are a cosmic design oracle. suggest mandala parameters in JSON format: { 'color': '#hex', 'size': number(1-50), 'divisions': even_number(4-36), 'message': 'Short poetic message in Japanese' }.";
-            const result = await callGemini({
-                contents: [{ parts: [{ text: query }] }],
-                systemInstruction: { parts: [{ text: systemPrompt }] },
-                generationConfig: { responseMimeType: "application/json" }
-            });
-            const data = JSON.parse(result.candidates[0].content.parts[0].text);
-            colorPicker.value = data.color; colorHex.textContent = data.color.toUpperCase();
-            sizeSlider.value = data.size; sizeVal.textContent = data.size;
-            divSlider.value = data.divisions; divVal.textContent = data.divisions;
-            aiResponse.classList.remove('hidden'); aiText.innerHTML = `<strong>Oracle:</strong> ${data.message}`;
-        } catch (e) { aiText.textContent = "宇宙との接続に失敗しました。"; }
-        finally { loadingOverlay.classList.add('hidden'); }
-    };
+  function setActiveTool(tool, btn) {
+    currentTool = tool;
+    [toolPen, toolDot, toolEraser].forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
 
-    analyzeBtn.onclick = async () => {
-        const pixelData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-        if (!pixelData.some(p => p !== 0)) { aiResponse.classList.remove('hidden'); aiText.textContent = "魂を投影してください。"; return; }
-        loadingOverlay.classList.remove('hidden');
-        try {
-            const result = await callGemini({
-                contents: [{
-                    role: "user",
-                    parts: [
-                        { text: "Analyze this mandala and provide a mystical interpretation in Japanese." },
-                        { inlineData: { mimeType: "image/png", data: canvas.toDataURL('image/png').split(',')[1] } }
-                    ]
-                }]
-            });
-            aiResponse.classList.remove('hidden');
-            aiText.innerHTML = `<strong>解析:</strong><br>${result.candidates[0].content.parts[0].text.replace(/\n/g, '<br>')}`;
-        } catch (e) { aiText.textContent = "解析に失敗しました。"; }
-        finally { loadingOverlay.classList.add('hidden'); }
-    };
+  toolPen.onclick = () => setActiveTool('pen', toolPen);
+  toolDot.onclick = () => setActiveTool('dot', toolDot);
+  toolEraser.onclick = () => setActiveTool('eraser', toolEraser);
+  undoBtn.onclick = undo;
 
-    saveBtn.onclick = () => {
-        const saveCanvas = document.createElement('canvas');
-        saveCanvas.width = canvas.width; saveCanvas.height = canvas.height;
-        const sCtx = saveCanvas.getContext('2d');
-        sCtx.fillStyle = '#05070a'; sCtx.fillRect(0, 0, saveCanvas.width, saveCanvas.height);
-        sCtx.drawImage(canvas, 0, 0);
-        saveCanvas.toBlob((blob) => {
-            const url = URL.createObjectURL(blob);
-            savePreview.src = url; downloadLink.href = url;
-            downloadLink.download = `mandala_${Date.now()}.png`;
-            saveModal.classList.remove('hidden');
-        }, 'image/png');
-    };
+  colorPicker.oninput = (e) => colorHex.textContent = e.target.value.toUpperCase();
+  sizeSlider.oninput = (e) => { sizeVal.textContent = e.target.value; };
+  divSlider.oninput = (e) => { divVal.textContent = e.target.value; };
+  guideToggle.onchange = drawGuidelines;
+  guideAlphaSlider.oninput = (e) => { guideAlphaVal.textContent = e.target.value; drawGuidelines(); };
 
-    closeModal.onclick = () => saveModal.classList.add('hidden');
-    clearBtn.onclick = () => { if(confirm('浄化しますか？')) { saveHistory(); ctx.clearRect(0, 0, canvas.width, canvas.height); } };
+  saveBtn.onclick = () => {
+       const saveCanvas = document.createElement('canvas');
+       saveCanvas.width = canvas.width; saveCanvas.height = canvas.height;
+       const sCtx = saveCanvas.getContext('2d');
+       sCtx.fillStyle = '#05070a'; sCtx.fillRect(0, 0, saveCanvas.width, saveCanvas.height);
+       sCtx.drawImage(canvas, 0, 0);
+       saveCanvas.toBlob((blob) => {
+           const url = URL.createObjectURL(blob);
+           savePreview.src = url; downloadLink.href = url;
+           downloadLink.download = `mandala_${Date.now()}.png`;
+           saveModal.classList.remove('hidden');
+       }, 'image/png');
+  };
 
-    window.addEventListener('resize', resizeCanvas);
-    initGuideList();
-    resizeCanvas();
+  closeModal.onclick = () => saveModal.classList.add('hidden');
+  clearBtn.onclick = () => { if(confirm('浄化しますか？')) { saveHistory(); ctx.clearRect(0, 0, canvas.width, canvas.height); } };
 
-    canvas.addEventListener('mousedown', handleStart);
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', () => isDrawing = false);
-    canvas.addEventListener('touchstart', handleStart, {passive: false});
-    window.addEventListener('touchmove', handleMove, {passive: false});
-    window.addEventListener('touchend', () => isDrawing = false);
+  // --- 鑑賞（アニメーション）モード ---
+  animateBtn.onclick = () => {
+      isAnimating = !isAnimating;
+      const mode = animMode.value;
+
+       if (isAnimating) {
+           if (mode === 'scatter') {
+               // 星屑モード時は元のキャンバスを透明にしてパーティクルを描画
+               canvasFrame.classList.add('opacity-0');
+           } else {
+               canvasFrame.className = `canvas-container animate-${mode}`;
+               canvasFrame.classList.remove('opacity-0');
+           }
+
+         animText.innerHTML = '動きを止める (Stop)';
+         animIcon.innerHTML = '⏹️';
+         animateBtn.classList.replace('bg-purple-600', 'bg-rose-600');
+         animateBtn.classList.replace('hover:bg-purple-500', 'hover:bg-rose-500');
+
+         // 背景パーティクルの開始
+         pCanvas.classList.remove('opacity-0');
+         initParticles(mode);
+         animateParticles();
+
+          // パレットが開いている場合は自動で閉じる
+          if (!sidebar.classList.contains('sidebar-collapsed')) {
+              toggleSidebarBtn.click();
+          }
+       } else {
+          // アニメーション停止処理（元に戻す）
+          canvasFrame.className = 'canvas-container';
+          canvasFrame.classList.remove('opacity-0');
+
+           animText.innerHTML = '命を吹き込む';
+           animIcon.innerHTML = '✨';
+           animateBtn.classList.replace('bg-rose-600', 'bg-purple-600');
+           animateBtn.classList.replace('hover:bg-rose-500', 'hover:bg-purple-500');
+
+           // 背景パーティクルの停止
+           pCanvas.classList.add('opacity-0');
+           cancelAnimationFrame(particleAnimationId);
+       }
+  };
+
+  // 初期化
+  window.addEventListener('resize', resizeCanvas);
+  initGuideList();
+  resizeCanvas();
+  drawGuidelines();
+
+  canvas.addEventListener('mousedown', handleStart);
+  window.addEventListener('mousemove', handleMove);
+  window.addEventListener('mouseup', () => isDrawing = false);
+  canvas.addEventListener('touchstart', handleStart, {passive: false});
+  window.addEventListener('touchmove', handleMove, {passive: false});
+  window.addEventListener('touchend', () => isDrawing = false);
 
 </script>
 </body>
