@@ -125,34 +125,11 @@
         border-radius: 10px;
      }
 
-     /* 視覚エフェクトアニメーションクラス */
-     .animate-pulse-mode {
-        animation: animPulse 30s linear infinite;
-     }
-     .animate-kaleidoscope {
-        animation: animKaleidoscope 20s ease-in-out infinite alternate;
-     }
-     .animate-warp {
-        animation: animWarp 15s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-     }
-
-     @keyframes animPulse {
-       0% { transform: rotate(0deg) scale(1); filter: hue-rotate(0deg); }
-       50% { transform: rotate(180deg) scale(1.05); filter: hue-rotate(180deg) drop-shadow(0 0 20px rgba(255,255,255,0.2)); }
-       100% { transform: rotate(360deg) scale(1); filter: hue-rotate(360deg); }
-     }
-
-     @keyframes animKaleidoscope {
-       0% { transform: rotate(0deg) scale(1); filter: hue-rotate(0deg) contrast(1); }
-       33% { transform: rotate(60deg) scale(1.15); filter: hue-rotate(120deg) contrast(1.4) drop-shadow(0 0 30px rgba(56, 189, 248, 0.5)); }
-       66% { transform: rotate(-30deg) scale(0.9); filter: hue-rotate(240deg) contrast(1.2) drop-shadow(0 0 40px rgba(236, 72, 153, 0.5)); }
-       100% { transform: rotate(90deg) scale(1.25); filter: hue-rotate(360deg) contrast(1.6) drop-shadow(0 0 50px rgba(168, 85, 247, 0.6)); }
-     }
-
-     @keyframes animWarp {
-       0% { transform: perspective(800px) rotateX(0deg) rotateY(0deg) rotateZ(0deg) scale(1); filter: hue-rotate(0deg); }
-       50% { transform: perspective(800px) rotateX(45deg) rotateY(15deg) rotateZ(180deg) scale(1.4); filter: hue-rotate(180deg) blur(1px); opacity: 0.9; }
-       100% { transform: perspective(800px) rotateX(0deg) rotateY(0deg) rotateZ(360deg) scale(1); filter: hue-rotate(360deg); }
+     /* 鑑賞モードはJS(requestAnimationFrame)で毎フレーム transform を更新する。
+        アニメーション中は .canvas-container の transition が邪魔になるため無効化する */
+     .anim-live {
+        transition: none !important;
+        will-change: transform, filter;
      }
   </style>
 </head>
@@ -412,6 +389,10 @@
          const offsetX = rect.left - pRect.left;
          const offsetY = rect.top - pRect.top;
 
+         const frameCx = offsetX + rect.width / 2;
+         const frameCy = offsetY + rect.height / 2;
+         const maxDist = Math.sqrt(rect.width * rect.width + rect.height * rect.height) / 2 || 1;
+
          for (let y = 0; y < canvas.height; y += step) {
             for (let x = 0; x < canvas.width; x += step) {
                const i = (y * canvas.width + x) * 4;
@@ -419,6 +400,9 @@
                if (a > 30) { // 不透明なピクセルを抽出
                    const homeX = offsetX + x * scaleX;
                    const homeY = offsetY + y * scaleY;
+                   const dx = homeX - frameCx;
+                   const dy = homeY - frameCy;
+                   const dist = Math.sqrt(dx * dx + dy * dy);
                    particles.push({
                       // 現在位置（描画用）
                       x: homeX,
@@ -426,6 +410,11 @@
                       // ホーム位置（元の曼荼羅の形）— ここに必ず戻ってくる
                       homeX: homeX,
                       homeY: homeY,
+                      // 中心からの距離・角度（渦巻き＆波状拡散に使う）
+                      homeDist: dist,
+                      homeAngle: Math.atan2(dy, dx),
+                      // 中心から外へ波が伝わるように、距離に応じた遅延を持たせる
+                      delay: (dist / maxDist) * 0.12 + Math.random() * 0.03,
                       color: `rgba(${imageData[i]}, ${imageData[i+1]}, ${imageData[i+2]}, ${a / 255})`,
                       size: Math.random() * 2 + 1,
                       // 各パーティクルの個性（位相・揺らぎの強さ）
@@ -443,23 +432,98 @@
 
     } else {
        // 背景用パーティクル
+       const cx = pCanvas.width / 2;
+       const cy = pCanvas.height / 2;
        for(let i = 0; i < 150; i++) {
+          const x = Math.random() * pCanvas.width;
+          const y = Math.random() * pCanvas.height;
           particles.push({
-              x: Math.random() * pCanvas.width,
-              y: Math.random() * pCanvas.height,
+              x: x,
+              y: y,
+              // 直前フレームの位置（ワープの光跡描画に使う）
+              px: x,
+              py: y,
               size: Math.random() * 2 + 0.5,
               speedX: (Math.random() - 0.5) * 0.8,
               speedY: (Math.random() - 0.5) * 0.8,
-              baseAlpha: Math.random() * 0.5 + 0.2
+              baseAlpha: Math.random() * 0.5 + 0.2,
+              // 万華鏡モード用の公転パラメータ
+              orbitR: Math.sqrt(Math.pow(x - cx, 2) + Math.pow(y - cy, 2)),
+              orbitA: Math.atan2(y - cy, x - cx),
+              orbitSpeed: (Math.random() * 0.4 + 0.1) * (Math.random() < 0.5 ? 1 : -1),
+              phase: Math.random() * Math.PI * 2
           });
        }
     }
 }
 
-function animateParticles() {
+// --- イージング関数 ---
+const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
+const easeInOutCubic = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const smoothstep = t => t * t * (3 - 2 * t);
+
+// 位相(0〜1)から拡散度を求める：散開 → 遊泳 → 回帰
+function dispersionAt(t) {
+    if (t < 0.3) return easeOutCubic(t / 0.3);
+    if (t < 0.7) return 1;
+    return 1 - easeInOutCubic((t - 0.7) / 0.3);
+}
+
+let animStartTime = 0; // アニメーション開始時刻（起動エンベロープ用）
+
+// キャンバス本体の transform / filter を連続関数で毎フレーム更新する。
+// CSSキーフレームと違い折り返し点がないため、動きが途切れず滑らか。
+function updateFrameTransform(mode, t, env) {
+    let transform = '';
+    let filter = '';
+
+    if (mode === 'pulse-mode') {
+        // ゆったり回転しながら、心拍のように二拍子で鼓動する
+        const rot = t * 9;
+        const beat = Math.pow(Math.max(0, Math.sin(t * 1.6)), 3) * 0.05
+                   + Math.sin(t * 0.5) * 0.02;
+        const scale = 1 + beat * env;
+        const glow = (14 + Math.sin(t * 1.6) * 10) * env;
+        transform = `rotate(${rot * env}deg) scale(${scale})`;
+        filter = `hue-rotate(${(t * 18 * env) % 360}deg) drop-shadow(0 0 ${glow}px rgba(180, 220, 255, 0.35))`;
+    }
+    else if (mode === 'kaleidoscope') {
+        // 複数のsin波を重ねて、揺れ戻りながら常に回り続ける
+        const rot = t * 8 + Math.sin(t * 0.35) * 50 + Math.sin(t * 0.13) * 25;
+        const scale = 1 + (Math.sin(t * 0.5) * 0.12 + Math.sin(t * 1.3 + 1) * 0.05) * env;
+        const hue = (t * 45) % 360;
+        const contrast = 1 + (0.25 + Math.sin(t * 0.45) * 0.2) * env;
+        const glowSize = (30 + Math.sin(t * 0.7) * 15) * env;
+        transform = `rotate(${rot * env}deg) scale(${scale})`;
+        filter = `hue-rotate(${hue * env}deg) contrast(${contrast}) drop-shadow(0 0 ${glowSize}px hsla(${(hue + 180) % 360}, 85%, 65%, ${0.55 * env}))`;
+    }
+    else if (mode === 'warp') {
+        // 3D空間でうねりながら進む。回転は止まらず、傾きはsin波で滑らかに往復
+        const rx = Math.sin(t * 0.42) * 38 * env;
+        const ry = Math.sin(t * 0.61 + 1.2) * 22 * env;
+        const rz = t * 16 * env;
+        const scale = 1 + (Math.sin(t * 0.3) * 0.18 + 0.05) * env;
+        transform = `perspective(800px) rotateX(${rx}deg) rotateY(${ry}deg) rotateZ(${rz}deg) scale(${scale})`;
+        filter = `hue-rotate(${(t * 25 * env) % 360}deg) drop-shadow(0 0 ${25 * env}px rgba(56, 189, 248, 0.4))`;
+    }
+
+    canvasFrame.style.transform = transform;
+    canvasFrame.style.filter = filter;
+}
+
+function animateParticles(now) {
   if (!isAnimating) return;
+  if (now === undefined) now = performance.now();
 
     const mode = animMode.value;
+    const t = (now - animStartTime) / 1000; // 経過秒
+    // 起動エンベロープ：最初の1.8秒でゆっくり動きが立ち上がる
+    const env = smoothstep(Math.min(1, t / 1.8));
+
+    // キャンバス本体の動き（scatterは本体非表示のためスキップ）
+    if (mode !== 'scatter') {
+        updateFrameTransform(mode, t, env);
+    }
 
     // 全モード共通でクリアに描画（残像なし）
     pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
@@ -467,38 +531,24 @@ function animateParticles() {
     const cx = pCanvas.width / 2;
     const cy = pCanvas.height / 2;
 
-    // scatter モード用：呼吸サイクルの進行度を算出
-    let dispersion = 0;
-    if (mode === 'scatter') {
-        // 1サイクル = 12秒（ゆっくりと）
-        const CYCLE_DURATION = 12000;
-        const elapsed = (performance.now() - scatterStartTime) % CYCLE_DURATION;
-        const t = elapsed / CYCLE_DURATION; // 0〜1 の進行度
+    // scatter モード用：呼吸サイクルの全体位相を算出（1サイクル = 12秒）
+    const CYCLE_DURATION = 12000;
+    const cycleT = ((now - scatterStartTime) % CYCLE_DURATION) / CYCLE_DURATION;
 
-        // フェーズ別の「ホーム位置からの距離係数」を算出
-        // 0 = ホーム位置にぴったり / 1 = 最大に拡散
-        if (t < 0.3) {
-            // 散開フェーズ（0〜30%）: easeOutCubicでふわっと浮上
-            const localT = t / 0.3;
-            dispersion = 1 - Math.pow(1 - localT, 3);
-        } else if (t < 0.7) {
-            // 遊泳フェーズ（30〜70%）: 拡散しきった状態で踊る
-            dispersion = 1;
-        } else {
-            // 回帰フェーズ（70〜100%）: easeInOutCubicで元の形に戻る
-            const localT = (t - 0.7) / 0.3;
-            dispersion = 1 - (localT < 0.5
-                ? 4 * localT * localT * localT
-                : 1 - Math.pow(-2 * localT + 2, 3) / 2);
-        }
+    if (mode === 'scatter') {
+        // 加算合成で星屑が重なるほど光る
+        pCtx.globalCompositeOperation = 'lighter';
     }
 
     particles.forEach(p => {
        if (mode === 'scatter') {
-           // === 呼吸サイクル: 散開 → 遊泳 → 回帰 を繰り返す ===
+           // === 呼吸サイクル: 散開 → 遊泳 → 回帰 を波のように繰り返す ===
+           // 中心から外へ波が伝わるよう、距離に応じた遅延つきで拡散度を算出
+           const localT = (cycleT - p.delay + 1) % 1;
+           const dispersion = dispersionAt(localT) * env;
 
            // 揺らぎ（踊るような動き）— 三角関数の重ね合わせで滑らかに
-           const time = performance.now() * p.floatSpeed;
+           const time = now * p.floatSpeed;
            const wobbleX = Math.cos(time + p.phase) * p.floatRange
                          + Math.sin(time * 1.7 + p.phase * 1.3) * p.floatRange * 0.4;
            const wobbleY = Math.sin(time + p.phase) * p.floatRange
@@ -508,51 +558,82 @@ function animateParticles() {
            const driftX = Math.cos(p.driftAngle) * 20 * dispersion;
            const driftY = Math.sin(p.driftAngle) * 20 * dispersion - 15 * dispersion;
 
-           // 最終位置 = ホーム位置 + 揺らぎ × 拡散度
-           p.x = p.homeX + (wobbleX + driftX) * dispersion;
-           p.y = p.homeY + (wobbleY + driftY) * dispersion;
+           // 渦：拡散するほど曼荼羅全体が銀河のようにゆっくりねじれる
+           const swirl = dispersion * 0.35 * Math.sin(t * 0.25);
+           const breathe = 1 + dispersion * 0.06;
+           const a = p.homeAngle + swirl;
+           // ホーム位置を曼荼羅中心のまわりに swirl だけ回転＋breathe 倍に拡大した位置
+           const homeX = p.homeX + (Math.cos(a) * breathe - Math.cos(p.homeAngle)) * p.homeDist;
+           const homeY = p.homeY + (Math.sin(a) * breathe - Math.sin(p.homeAngle)) * p.homeDist;
 
-           // 拡散度に応じて少しだけ明度を変化させる（呼吸感）
+           // 最終位置 = 渦を含むホーム位置 + 揺らぎ × 拡散度
+           p.x = homeX + (wobbleX + driftX) * dispersion;
+           p.y = homeY + (wobbleY + driftY) * dispersion;
+
+           // きらめき：個体ごとに明滅しつつ、拡散の中間で最も輝く
+           const twinkle = 0.75 + 0.25 * Math.sin(now * 0.003 + p.phase * 3);
            pCtx.fillStyle = p.color;
-           pCtx.globalAlpha = 0.7 + 0.3 * (1 - Math.abs(dispersion - 0.5) * 2);
+           pCtx.globalAlpha = twinkle * (0.6 + 0.4 * (1 - Math.abs(dispersion - 0.5) * 2));
            pCtx.fillRect(p.x, p.y, p.size, p.size);
-           pCtx.globalAlpha = 1.0;
        }
        else if (mode === 'warp') {
-          // ワープモード：放射状に飛ぶ
+          // ワープモード：放射状に加速し、光の筋（ストリーク）を残す
+          p.px = p.x; p.py = p.y;
           const dx = p.x - cx;
           const dy = p.y - cy;
           const dist = Math.sqrt(dx*dx + dy*dy) || 1;
-          p.x += (dx / dist) * (dist * 0.02 + 1);
-          p.y += (dy / dist) * (dist * 0.02 + 1);
-          p.size += 0.02;
+          const speed = (dist * 0.03 + 1.5) * env;
+          p.x += (dx / dist) * speed;
+          p.y += (dy / dist) * speed;
+          p.size += 0.03;
 
           if (p.x < 0 || p.x > pCanvas.width || p.y < 0 || p.y > pCanvas.height) {
               p.x = cx + (Math.random() - 0.5) * 100;
               p.y = cy + (Math.random() - 0.5) * 100;
+              p.px = p.x; p.py = p.y;
               p.size = Math.random() * 1.5 + 0.5;
           }
+          // 移動した軌跡を線で描くと、速いほど長い光の筋になる
+          pCtx.beginPath();
+          pCtx.moveTo(p.px, p.py);
+          pCtx.lineTo(p.x, p.y);
+          pCtx.lineWidth = p.size;
+          pCtx.lineCap = 'round';
+          pCtx.strokeStyle = `hsla(${200 + Math.sin(now * 0.0005 + p.phase) * 30}, 90%, 75%, ${p.baseAlpha * env})`;
+          pCtx.stroke();
+       }
+       else if (mode === 'kaleidoscope') {
+          // 万華鏡モード：中心の周りをゆっくり公転し、半径も呼吸する
+          p.orbitA += p.orbitSpeed * 0.004 * env;
+          const r = p.orbitR * (1 + 0.08 * Math.sin(now * 0.0006 + p.phase));
+          p.x = cx + Math.cos(p.orbitA) * r;
+          p.y = cy + Math.sin(p.orbitA) * r;
+
           pCtx.beginPath();
           pCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-          pCtx.fillStyle = `rgba(150, 220, 255, ${p.baseAlpha})`;
+          pCtx.fillStyle = `hsla(${(now * 0.02 + p.phase * 60) % 360}, 80%, 70%, ${p.baseAlpha * env})`;
           pCtx.fill();
-       } else {
-          // 通常・万華鏡モード：ふわふわ漂う
-          p.x += p.speedX;
-          p.y += p.speedY;
+       }
+       else {
+          // 鼓動モード：ふわふわ漂いながら明滅する
+          p.x += p.speedX * env;
+          p.y += p.speedY * env;
           if (p.x < 0) p.x = pCanvas.width;
           if (p.x > pCanvas.width) p.x = 0;
           if (p.y < 0) p.y = pCanvas.height;
           if (p.y > pCanvas.height) p.y = 0;
 
+           const twinkle = 0.6 + 0.4 * Math.sin(now * 0.002 + p.phase);
            pCtx.beginPath();
            pCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-           pCtx.fillStyle = mode === 'kaleidoscope'
-             ? `hsla(${(p.x + p.y) % 360}, 80%, 70%, ${p.baseAlpha})`
-             : `rgba(150, 220, 255, ${p.baseAlpha})`;
+           pCtx.fillStyle = `rgba(150, 220, 255, ${p.baseAlpha * twinkle * env})`;
            pCtx.fill();
        }
     });
+
+    // 合成モードとアルファを元に戻す
+    pCtx.globalCompositeOperation = 'source-over';
+    pCtx.globalAlpha = 1.0;
 
     particleAnimationId = requestAnimationFrame(animateParticles);
 }
@@ -951,11 +1032,14 @@ function drawPoints(x1, y1, x2, y2) {
       const mode = animMode.value;
 
        if (isAnimating) {
+           animStartTime = performance.now();
+
            if (mode === 'scatter') {
                // 星屑モード時は元のキャンバスを透明にしてパーティクルを描画
                canvasFrame.classList.add('opacity-0');
            } else {
-               canvasFrame.className = `canvas-container animate-${mode}`;
+               // JS駆動アニメーション中はCSS transitionを切って毎フレーム直接動かす
+               canvasFrame.classList.add('anim-live');
                canvasFrame.classList.remove('opacity-0');
            }
 
@@ -974,9 +1058,12 @@ function drawPoints(x1, y1, x2, y2) {
               toggleSidebarBtn.click();
           }
        } else {
-          // アニメーション停止処理（元に戻す）
-          canvasFrame.className = 'canvas-container';
+          // アニメーション停止処理：.anim-live を外すことでCSS transitionが復活し、
+          // 現在の姿勢から0.6秒かけてふわっと元の位置へ戻る
+          canvasFrame.classList.remove('anim-live');
           canvasFrame.classList.remove('opacity-0');
+          canvasFrame.style.transform = '';
+          canvasFrame.style.filter = '';
 
            animText.innerHTML = '命を吹き込む';
            animIcon.innerHTML = '✨';
